@@ -10,7 +10,7 @@ The code is written in 6502 assembly and was compiled with the
 main loop is in [chucks_prg.p65](./chucks_prg.p65). It runs best on
 FCEU (or it did when I developed it), as this was used for testing. 
 It runs on the actual NES hardware, as well, but with some added
-choppiness due to how the graphics updates were (mis)handled. A 
+choppiness in the music due to how the graphics updates were (mis)handled. A 
 cycle-accurate emulator such as Nestopia will reproduce this choppiness.
 
 Screenshots:

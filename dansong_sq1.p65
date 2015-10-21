@@ -1,0 +1,111 @@
+; dans song
+
+; $4000, index to note, length counter load register, timer value
+; $4000 = 
+; 0-3 volume / envelope decay 
+; 4 = env dec. disable, 
+; 5 = length counter clock disable / env decay looping enable
+; 6-7 duty cycle type
+
+; index to note (check notes for values)
+; length counter load register =
+; 3-7 length counter (leave 0-2 0 always)
+.byte $87,$7c,$08,$d2
+.byte $87,$2c,$08,$0e   
+.byte $87,$34,$08,$0e   
+.byte $87,$36,$08,$0e   
+.byte $87,$3a,$08,$0e   
+.byte $87,$36,$08,$1c   
+.byte $87,$7c,$08,$0e
+
+.byte $87,$7c,$08,$0e
+.byte $87,$28,$08,$0e   
+.byte $87,$30,$08,$0e   
+.byte $87,$34,$08,$0e   
+.byte $87,$36,$08,$0e  
+.byte $87,$2c,$08,$1c  
+.byte $87,$7c,$08,$0e
+
+.byte $87,$7c,$08,$0e
+.byte $87,$2c,$08,$0e   
+.byte $87,$34,$08,$0e  
+.byte $87,$36,$08,$0e  
+.byte $87,$3a,$08,$0e  
+.byte $87,$36,$08,$1c  
+.byte $87,$30,$08,$1c  
+
+.byte $87,$28,$08,$0e  
+.byte $87,$30,$08,$0e  
+.byte $87,$34,$08,$0e  
+.byte $87,$36,$08,$0e  
+.byte $87,$2c,$08,$1c  
+.byte $87,$7c,$08,$0e
+
+.byte $87,$7c,$08,$0e
+.byte $87,$7c,$08,$0e
+.byte $42,$26,$08,$0e
+.byte $42,$28,$08,$0e
+.byte $42,$2c,$08,$0e
+.byte $42,$30,$08,$0e
+.byte $42,$7c,$08,$0e
+.byte $42,$7c,$08,$0e
+
+.byte $42,$7c,$08,$0e
+.byte $42,$7c,$08,$0e
+.byte $42,$36,$08,$0e
+.byte $42,$34,$08,$0e
+.byte $42,$30,$08,$0e
+.byte $42,$2c,$08,$0e
+.byte $42,$7c,$08,$0e
+.byte $42,$7c,$08,$0e
+
+.byte $42,$7c,$08,$0e
+.byte $42,$7c,$08,$0e
+
+.byte $42,$26,$08,$0e
+.byte $42,$28,$08,$0e
+.byte $42,$2c,$08,$0e
+.byte $42,$30,$08,$1c
+.byte $42,$2c,$08,$1c
+.byte $42,$7c,$08,$0e
+
+.byte $42,$30,$08,$0e
+.byte $42,$34,$08,$0e
+.byte $42,$36,$08,$0e
+.byte $42,$36,$08,$1c
+.byte $42,$7c,$08,$1c
+
+.byte $87,$36,$08,$0e
+.byte $87,$3e,$08,$0e
+.byte $87,$3a,$08,$0e
+.byte $87,$3e,$08,$0e
+.byte $87,$36,$08,$1c
+
+.byte $87,$2c,$08,$0e
+.byte $87,$28,$08,$0e
+.byte $87,$28,$08,$0e
+.byte $87,$2c,$08,$0e
+.byte $87,$36,$08,$0e
+.byte $87,$34,$08,$0e
+.byte $87,$30,$08,$1c
+
+.byte $87,$2c,$08,$0e
+.byte $87,$28,$08,$0e
+.byte $87,$28,$08,$0e
+.byte $87,$28,$08,$0e
+.byte $87,$30,$08,$0e
+.byte $87,$28,$08,$0e
+.byte $87,$2c,$08,$1c
+.byte $87,$36,$08,$1c
+
+.byte $87,$2c,$08,$0e
+.byte $87,$30,$08,$0e
+.byte $87,$34,$08,$0e
+.byte $87,$36,$08,$1c
+.byte $87,$36,$08,$2a
+.byte $87,$7c,$08,$0e
+
+
+
+.byte $ff
+

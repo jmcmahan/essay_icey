@@ -1,0 +1,15 @@
+;$400c, $400e, $400f, time to load counter
+;$400c = envelope decay rate (4 bits)
+;$400e = 0-3 = sample rate (?), 7 = random number type generation
+;$400f = 3-7 = length counter load register
+.byte $02,$02,$08,$0e
+.byte $00,$02,$08,$0e
+.byte $00,$02,$08,$0e
+.byte $02,$02,$08,$0e
+.byte $00,$02,$08,$0e
+.byte $00,$02,$08,$0e
+.byte $02,$02,$08,$0e
+.byte $00,$02,$08,$0e
+
+.byte $ff
+

@@ -1,0 +1,73 @@
+; $4000, index to note, length counter load register, timer value
+; $4000 = 
+; 0-3 volume / envelope decay 
+; 4 = env dec. disable, 
+; 5 = length counter clock disable / env decay looping enable
+; 6-7 duty cycle type
+
+; index to note (check notes for values)
+; length counter load register =
+; 3-7 length counter (leave 0-2 0 always)
+
+.byte $4c,$7c,$08,$d2
+.byte $4c,$7c,$08,$00
+.byte $4c,$7c,$08,$00
+.byte $4c,$7c,$08,$00
+.byte $4c,$7c,$08,$00
+.byte $4c,$7c,$08,$00
+.byte $4c,$7c,$08,$4e
+
+.byte $4c,$7c,$08,$d2
+.byte $4c,$7c,$08,$0e   
+
+.byte $4c,$22,$08,$2a   
+.byte $4c,$26,$08,$2a   
+.byte $4c,$7c,$08,$1c
+
+.byte $4c,$22,$08,$2a   
+.byte $4c,$1e,$08,$2a   
+.byte $4c,$7c,$08,$1c
+
+.byte $4c,$22,$08,$2a   
+.byte $4c,$26,$08,$2a   
+.byte $4c,$7c,$08,$1c
+
+.byte $4c,$22,$08,$2a   
+.byte $4c,$1e,$08,$2a   
+.byte $4c,$7c,$08,$1c
+
+.byte $42,$14,$08,$2a   
+.byte $42,$28,$08,$2a   
+.byte $42,$7c,$08,$1c
+
+.byte $42,$28,$08,$2a   
+.byte $42,$26,$08,$2a   
+.byte $42,$7c,$08,$1c
+
+.byte $42,$14,$08,$2a   
+.byte $42,$28,$08,$1c   
+.byte $42,$26,$08,$0e   
+.byte $42,$7c,$08,$1c
+
+.byte $42,$28,$08,$2a   
+.byte $42,$26,$08,$2a   
+.byte $42,$7c,$08,$1c
+
+.byte $48,$2c,$08,$2a   
+.byte $48,$28,$08,$2a   
+.byte $44,$22,$08,$1c
+
+.byte $48,$26,$08,$2a   
+.byte $48,$22,$08,$2a   
+.byte $44,$1e,$08,$1c
+
+.byte $48,$22,$08,$2a   
+.byte $44,$26,$08,$1c   
+.byte $44,$28,$08,$1c
+.byte $42,$7c,$08,$0e
+
+.byte $48,$22,$08,$38   
+.byte $48,$26,$08,$1c   
+.byte $48,$7c,$08,$1c
+
+.byte $ff

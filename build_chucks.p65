@@ -1,0 +1,22 @@
+; iNES identifier
+.byte "NES"
+.byte $1a
+
+; number of PRG-ROM blocks
+.byte $02
+
+; number of CHR-ROM blocks
+.byte $01
+
+; ROM control bytes
+;.byte $00, $00
+.byte $20, $40
+
+; fill with zeros to address $10 in the file
+.advance $10
+
+; PRG-ROM
+.include "chucks_prg.p65"
+
+; CHR-ROM
+.incbin "chucks.chr"

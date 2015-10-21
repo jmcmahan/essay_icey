@@ -1,0 +1,179 @@
+; Triangle
+
+
+; a0 00
+.byte $f1,$07
+; a+0 02
+.byte $7f,$07
+; b0 04
+.byte $13,$07
+; c1 06
+.byte $ae,$06
+; c+1 08
+.byte $4e,$06
+; d1 0a
+.byte $f3,$05
+; d+1 0c
+.byte $9d,$05
+; e1 0e
+.byte $4d,$05
+; f1 10
+.byte $00,$05
+; f+1 12
+.byte $b9,$04
+; g1 14
+.byte $75,$04
+; g+1 16
+.byte $34,$04
+; a1 18
+.byte $f8,$03
+; a+1 1a
+.byte $bf,$03
+; b1 1c
+.byte $89,$03
+; c2 1e
+.byte $56,$03
+; c+2 20
+.byte $26,$03
+; d2 22
+.byte $f9,$02
+; d+2 24
+.byte $ce,$02
+; e2 26
+.byte $a6,$02
+; f2 28
+.byte $80,$02
+; f+2 2a
+.byte $5c,$02
+; g2 2c
+.byte $3a,$02
+; g+2 2e
+.byte $1a,$02
+; a2 30
+.byte $fc,$01
+; a+2 32
+.byte $df,$01
+; b2 34
+.byte $c4,$01
+; c3 36
+.byte $ab,$01
+; c+3 38
+.byte $93,$01
+; d3 3a
+.byte $7c,$01
+; d+3 3c
+.byte $66,$01
+; e3 3e
+.byte $52,$01
+; f3 40
+.byte $3f,$01
+; f+3 42
+.byte $2d,$01
+; g3 44
+.byte $1c,$01
+; g+3 46
+.byte $0c,$01
+; a3 48
+.byte $fd,$00
+; a+3 4a
+.byte $ef,$00
+; b3 4c
+.byte $e2,$00
+; c4 4e
+.byte $d5,$00
+; c+4 50
+.byte $c9,$00
+; d4 52
+.byte $be,$00
+; d+4 54
+.byte $b3,$00
+; e4 56
+.byte $a9,$00
+; f4 58
+.byte $9f,$00
+; f+4 5a
+.byte $96,$00
+; g4 5c
+.byte $8e,$00
+; g+4 5e
+.byte $86,$00
+; a4 60
+.byte $7e,$00
+; a+4 62
+.byte $77,$00
+; b4 64
+.byte $70,$00
+; c5 66
+.byte $6a,$00
+; c+5 68
+.byte $64,$00
+; d5 6a
+.byte $5e,$00
+; d+5 6c
+.byte $59,$00
+; e5 6e
+.byte $54,$00
+; f5 70
+.byte $4f,$00
+; f+5 72
+.byte $4b,$00
+; g5 74
+.byte $46,$00
+; g+5 76
+.byte $42,$00
+; a5 78
+.byte $3f,$00
+; a+5 7a
+.byte $3b,$00
+; b5 7c
+.byte $38,$00
+; c6 7e
+.byte $34,$00
+; c+6 80
+.byte $31,$00
+; d6 82
+.byte $2f,$00
+; d+6 84
+.byte $2c,$00
+; e6 86
+.byte $29,$00
+; f6 88
+.byte $27,$00
+; f+6 8a
+.byte $25,$00
+; g6 8c
+.byte $23,$00
+; g+6 8e
+.byte $21,$00
+; a6 90
+.byte $1f,$00
+; a+6 92
+.byte $1d,$00
+; b6 94
+.byte $1b,$00
+; c7 96
+.byte $1a,$00
+; c+7 98
+.byte $18,$00
+; d7 9a
+.byte $17,$00
+; d+7 9c
+.byte $15,$00
+; e7 9e
+.byte $14,$00
+; f7 a0
+.byte $13,$00
+; f+7 a2
+.byte $12,$00
+; g7 a4
+.byte $11,$00
+; g+7 a6
+.byte $10,$00
+; a7 a8
+.byte $0f,$00
+; a+7 aa
+.byte $0e,$00
+; b7 ac
+.byte $0d,$00
+; silence  ae
+.byte $00,$00

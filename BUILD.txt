@@ -1,0 +1,2 @@
+To build, use the "make_game.sh" script. Requires the Ophis p65 assembler by 
+Michael C. Martin.

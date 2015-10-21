@@ -1,0 +1,3711 @@
+; Chuck's Challenge
+
+.include "nes_reg.p65"
+
+; declare constants here
+
+; for controller button presses
+.alias A_BUT        $80
+.alias B_BUT        $40
+.alias SELECT_BUT   $20
+.alias START_BUT    $10
+.alias UP_BUT       $08
+.alias DOWN_BUT     $04
+.alias LEFT_BUT     $02
+.alias RIGHT_BUT    $01
+
+; for internal representation of up, down, left, right position
+.alias PLAYER_DOWN      $00
+.alias PLAYER_UP        $01
+.alias PLAYER_RIGHT     $02 
+.alias PLAYER_LEFT      $03
+
+; player miscellaneous constants
+.alias PLAYER_SPEED     $03     ;3 for optimal look
+.alias PLAYER_COOLDOWN  $04     ;2 is the going rate for now
+
+
+; for blinking lights
+.alias BLINK_CONST      $26
+
+.alias BLINK_TIME       $0b
+.alias NPC1_ANIM_TIME   $0f
+.alias NPC2_ANIM_TIME   $13
+
+.alias JERRY_COUNT      $05     ; number of times to talk to Jerry to wake
+
+.text zero_page
+.org $0000
+
+; declare auto allocated zero page variables here
+
+.space con1 1           ; holds controller state
+
+
+.space player_frame 1   ; can be any value, but only lower 2 bits matter -
+                        ; frames 0, 1, 2, and 3 where 1 & 3 are the same
+.space player_dir 1     ; 0 = down, 1 = up, 2 = right, 3 = left
+.space player_moving 1  ; 0 = not moving, 1 = moving
+
+.space temp1 1          ; variables named "temp" for quick calculation
+.space temp2 1
+
+                        ; these timers increment once per vblank 
+.space timer_high 1     ; high byte of a timer 
+.space timer_low 1      ; low byte of a timer
+.space move_cooldown 1  ; timer for movement 
+
+.space arg1 1           ; use for arguments to subroutines, if needed
+.space arg2 1           ; use for arguments to subroutines, if needed
+.space arg3 1           ; use for arguments to subroutines, if needed
+.space arg4 1           ; use for arguments to subroutines, if needed
+.space ret1 1           ; use for return value of subroutine, if needed
+.space ret2 1           ; use for return value of subroutine, if needed
+.space ret3 1           ; use for return value of subroutine, if needed
+.space ret4 1           ; use for return value of subroutine, if needed
+
+.space current_map 1    ; stores currently loaded map
+.space map_addr 2       ; stores address of current map data
+.space attr_addr 2       ; stores address of attribute table for map
+
+.space temp_addr16 2    ; use for storing 16 bit addresses
+
+.space temp_count1 1    ; use for counting in loops when x & y are occupied
+
+.space debug1 1         ; use just for debugging
+.space debug2 1
+.space debug3 1
+.space debug_index 1
+
+.space int_temp1 1      ; use only for NMI
+.space blinker 1        ; use for blinking color
+
+.space update_blink 1   ; indicates whether blink should be set or not
+.space blink_timer 1    ; timer for blinks
+
+.space jmp_addr 2       ; use for indirect jump
+
+.space tile_toggle_1 1  ; values to eor with tiles to toggle them
+.space tile_toggle_2 1  
+
+.space anim1_timer 1    ; timer for toggling first sprite animation
+.space anim2_timer 1    ; timer for toggling second sprite animation
+
+.space update_anim1 1   ; says we should toggle animation now for sprite 1
+.space update_anim2 1   ; similar
+
+.space need_clear 1     ; flag which says A button needs to be pressed
+                        ; again to clear the screen
+
+.space jerry_talk_count 1   ; counter to see when jerry will wake up
+
+.space letgo 1      ; set when button is pressed to clear text
+
+; game states - which task is on, controlling which 
+; text is displayed, which items displayed, etc.
+; 0 = just beginning, talk about qsort quest
+; 1 = got magic card, waiting to talk to Ken
+; 2 = got qsort, use waiting to use it on comp
+; 3 = done with sort quest, begin PIC quest
+; 4 = got Naruto DVD, waiting to give to Alex
+; 5 = got PIC, waiting to use it on comp
+; 6 = Jerry quest, waiting to talk to Jerry 4 times
+; 7 = got Linux c.d., waiting to use it on comp
+; 8 = done with Jerry quest, begin Jack quest
+; 9 = got Chinese dictionary, waiting to talk to Jack
+; 10 = got poison from Jack, waiting to use on Jerry
+; 11 = Jerry dead, begin Scott quest
+; 12 = got Alcohol, waiting to give to Scott
+; 13 = got labview, waiting to use on computer
+; this should end the game
+
+.space game_state 1
+
+; this is for the optional Dan quest, if I end up doing it.
+
+.space got_carrot 1
+
+
+; music variables
+
+.space snd_addr 2
+.space snd1 1
+.space snd2 1
+
+.space mus_timer_1 1
+.space mus_timer_2 1
+.space mus_timer_3 1
+.space mus_timer_4 1
+
+.space sqw1_1 1
+.space sqw1_2 1
+.space sqw1_b1 1
+.space sqw1_b2 1
+
+.space sqw2_1 1
+.space sqw2_2 1
+.space sqw2_b1 1
+.space sqw2_b2 1
+
+.space tri_1 1
+.space tri_2 1
+.space tri_b1 1
+.space tri_b2 1
+
+.space noise_1 1
+.space noise_2 1
+.space noise_b1 1
+.space noise_b2 1
+
+
+
+; declare variables with specific addresses here 
+
+
+
+; Page for storing sprite memory for sprite DMA
+.alias sprites $0200
+
+; main character sprites
+; upper left
+.alias player_ul_y $0200
+.alias player_ul_t $0201
+.alias player_ul_a $0202
+.alias player_ul_x $0203
+
+; upper right
+.alias player_ur_y $0204
+.alias player_ur_t $0205
+.alias player_ur_a $0206
+.alias player_ur_x $0207
+
+; lower left
+.alias player_ll_y $0208
+.alias player_ll_t $0209
+.alias player_ll_a $020a
+.alias player_ll_x $020b
+
+; lower right
+.alias player_lr_y $020c
+.alias player_lr_t $020d
+.alias player_lr_a $020e
+.alias player_lr_x $020f
+
+; non-player character sprites - sometimes not all used
+; npc 1
+; upper left
+.alias npc1_ul_y $0210
+.alias npc1_ul_t $0211
+.alias npc1_ul_a $0212
+.alias npc1_ul_x $0213
+
+; upper right
+.alias npc1_ur_y $0214
+.alias npc1_ur_t $0215
+.alias npc1_ur_a $0216
+.alias npc1_ur_x $0217
+
+; lower left
+.alias npc1_ll_y $0218
+.alias npc1_ll_t $0219
+.alias npc1_ll_a $021a
+.alias npc1_ll_x $021b
+
+; lower right
+.alias npc1_lr_y $021c
+.alias npc1_lr_t $021d
+.alias npc1_lr_a $021e
+.alias npc1_lr_x $021f
+
+; npc 2
+; upper left
+.alias npc2_ul_y $0220
+.alias npc2_ul_t $0221
+.alias npc2_ul_a $0222
+.alias npc2_ul_x $0223
+
+; upper right
+.alias npc2_ur_y $0224
+.alias npc2_ur_t $0225
+.alias npc2_ur_a $0226
+.alias npc2_ur_x $0227
+
+; lower left
+.alias npc2_ll_y $0228
+.alias npc2_ll_t $0229
+.alias npc2_ll_a $022a
+.alias npc2_ll_x $022b
+
+; lower right
+.alias npc2_lr_y $022c
+.alias npc2_lr_t $022d
+.alias npc2_lr_a $022e
+.alias npc2_lr_x $022f
+
+; item sprites
+
+; item 1 - only one item on screen at once
+
+.alias item1_y $0230
+.alias item1_t $0231
+.alias item1_a $0232
+.alias item1_x $0233
+
+
+
+.text
+.org $8000
+
+reset:
+    ; initialization routine from Michael Martin's tutorial
+
+    sei
+    cld
+
+    ; wait two VBlanks
+    jsr wait_vblank
+
+    ; disable graphics during initialization
+    lda #$00
+    sta PPU_CON1
+    sta PPU_CON2
+
+    ; zero RAM
+    lda #$00
+    ldx #$00
+*   sta $0000, x
+    sta $0100, x
+    sta $0200, x
+    sta $0300, x
+    sta $0400, x
+    sta $0500, x
+    sta $0600, x
+    sta $0700, x
+    inx
+    bne -
+
+    ; reset stack
+    ldx #$ff
+    txs
+
+
+
+    jsr load_title_music
+    jsr init_graphics
+    jsr do_title
+    jsr init_vars
+    jsr load_main_music
+    jsr refresh_map
+    jsr graphics_on
+
+
+main:
+    
+    
+    jsr poll_input
+    ; note - something screwy is going on - the input is getting
+    ; garbage bits set when moving, requiring this "check_action_button"
+    ; routine to be called right after polling the input. might be a
+    ; good idea to figure out why this is, if I get tired of being lazy
+    jsr check_action_button
+    ;jsr debug_button
+    jsr check_ending
+    lda need_clear
+    bne +
+    lda move_cooldown
+    bne +
+    jsr update_dir
+    jsr update_animation
+    jsr update_position
+    
+
+*   jsr blinky
+    jsr update_bg_anim
+    jsr update_sprites
+    ;ldx move_cooldown
+    ;beq +
+    ;dex 
+    ;stx move_cooldown
+*   jmp main
+
+
+load_silence_music:
+    lda #$00
+    sta $4015
+    lda #<silence_square
+    sta sqw1_1
+    sta sqw1_b1
+    sta sqw2_1
+    sta sqw2_b1
+    lda #>silence_square
+    sta sqw1_2
+    sta sqw1_b2
+    sta sqw2_2
+    sta sqw2_b2
+
+
+    lda #<silence_triangle
+    sta tri_1
+    sta tri_b1
+    lda #>silence_triangle
+    sta tri_2
+    sta tri_b2
+
+    lda #<silence_noise
+    sta noise_1
+    sta noise_b1
+    lda #>silence_noise
+    sta noise_2
+    sta noise_b2
+
+    lda #$24
+    sta mus_timer_1
+    sta mus_timer_2
+    sta mus_timer_3
+    sta mus_timer_4
+    rts
+
+
+
+load_title_music:
+    jsr load_silence_music
+    lda #<fyeah_square1
+    sta sqw1_1
+    sta sqw1_b1
+    lda #>fyeah_square1
+    sta sqw1_2
+    sta sqw1_b2
+
+    lda #<fyeah_square2
+    sta sqw2_1
+    sta sqw2_b1
+    lda #>fyeah_square2
+    sta sqw2_2
+    sta sqw2_b2
+
+    lda #<fyeah_triangle
+    sta tri_1
+    sta tri_b1
+    lda #>fyeah_triangle
+    sta tri_2
+    sta tri_b2
+
+    lda #<fyeah_noise
+    sta noise_1
+    sta noise_b1
+    lda #>fyeah_noise
+    sta noise_2
+    sta noise_b2
+
+    lda #$24
+    sta mus_timer_1
+    sta mus_timer_2
+    sta mus_timer_3
+    sta mus_timer_4
+    jsr init_sound
+    rts
+
+
+load_main_music:
+    jsr load_silence_music
+    lda #<main_square1
+    sta sqw1_1
+    sta sqw1_b1
+    lda #>main_square1
+    sta sqw1_2
+    sta sqw1_b2
+
+    lda #<main_square2
+    sta sqw2_1
+    sta sqw2_b1
+    lda #>main_square2
+    sta sqw2_2
+    sta sqw2_b2
+
+    lda #<main_triangle
+    sta tri_1
+    sta tri_b1
+    lda #>main_triangle
+    sta tri_2
+    sta tri_b2
+
+    lda #<main_noise
+    sta noise_1
+    sta noise_b1
+    lda #>main_noise
+    sta noise_2
+    sta noise_b2
+
+    lda #$24
+    sta mus_timer_1
+    sta mus_timer_2
+    sta mus_timer_3
+    sta mus_timer_4
+
+    jsr init_sound
+    rts
+
+
+load_end_music:
+    jsr load_silence_music
+    lda #<dansong_square1
+    sta sqw1_1
+    sta sqw1_b1
+    lda #>dansong_square1
+    sta sqw1_2
+    sta sqw1_b2
+
+    lda #<dansong_square2
+    sta sqw2_1
+    sta sqw2_b1
+    lda #>dansong_square2
+    sta sqw2_2
+    sta sqw2_b2
+
+    lda #<dansong_triangle
+    sta tri_1
+    sta tri_b1
+    lda #>dansong_triangle
+    sta tri_2
+    sta tri_b2
+
+    lda #<dansong_noise
+    sta noise_1
+    sta noise_b1
+    lda #>dansong_noise
+    sta noise_2
+    sta noise_b2
+
+    lda #$24
+    sta mus_timer_1
+    sta mus_timer_2
+    sta mus_timer_3
+    sta mus_timer_4
+    jsr init_sound
+    rts
+
+init_graphics:
+    jsr wait_vblank
+
+    ; load palette
+    lda #$3F
+    ldx #$00
+    sta VRAM_ADDR2
+    stx VRAM_ADDR2
+*   lda palette, x
+    sta VRAM_DATA
+    inx
+    cpx #$20
+    bne -
+
+    ; initialize sprite memory
+    
+    ldx #$00
+    lda #$00
+
+    ; ugly way to do this, but whatever
+*   sta $0200,x
+    inx
+    lda #$ff
+    sta $0200,x
+    inx
+    lda #$00
+    sta $0200,x
+    inx 
+    sta $0200,x
+    inx
+    bne -
+
+    jsr update_sprites
+    
+
+    rts
+
+
+wait_vblank:
+*   lda PPU_STAT
+    bpl -
+*   lda PPU_STAT
+    bpl -
+    rts
+
+blinky:
+    ; make colors blink
+    lda update_blink
+    beq blinky_exit
+
+    jsr wait_vblank
+    jsr graphics_off
+    lda #$3f
+    ldx #$0e
+    sta VRAM_ADDR2
+    stx VRAM_ADDR2
+
+    lda blinker
+    eor #BLINK_CONST
+    sta blinker
+    sta VRAM_DATA
+    eor #BLINK_CONST
+    sta VRAM_DATA
+    jsr graphics_on
+    lda #$00
+    sta update_blink
+
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+blinky_exit:
+    rts
+
+
+check_ending:
+    lda game_state
+    cmp #$0e
+    bne check_ending_exit
+    lda need_clear
+    cmp #$00
+    bne check_ending_exit
+    jsr do_ending
+    
+check_ending_exit:
+    rts
+
+update_bg_anim:
+    ldx #$00
+    lda update_anim1
+    beq +
+    lda #$00
+    sta update_anim1
+
+    lda npc1_ul_t
+    eor tile_toggle_1
+    sta npc1_ul_t
+
+    lda npc1_ur_t
+    eor tile_toggle_1
+    sta npc1_ur_t
+
+    lda npc1_ll_t
+    eor tile_toggle_1
+    sta npc1_ll_t
+
+    lda npc1_lr_t
+    eor tile_toggle_1
+    sta npc1_lr_t
+
+    inx             ; tells it to update sprites
+
+
+    ; can't just increment here since it could be
+    ; an empty sprite
+*   lda update_anim2
+    beq update_bg_anim_exit
+    lda #$00
+    sta update_anim2
+
+    lda npc2_ul_t
+    eor tile_toggle_2
+    sta npc2_ul_t
+
+    lda npc2_ur_t
+    eor tile_toggle_2
+    sta npc2_ur_t
+
+    lda npc2_ll_t
+    eor tile_toggle_2
+    sta npc2_ll_t
+
+    lda npc2_lr_t
+    eor tile_toggle_2
+    sta npc2_lr_t
+
+    inx             ; tells it to update sprites
+
+
+update_bg_anim_exit:
+    cpx #$00
+    beq +
+    jsr update_sprites
+*   rts
+
+graphics_on:
+    ; graphics on
+    lda #[VBLANK_NMI_ON + SPR_PT_1000]
+    sta PPU_CON1
+    lda #[SPR_VISIBLE + BG_VISIBLE + SPR_CLIP_ON + BG_CLIP_ON]
+    sta PPU_CON2
+    rts
+
+graphics_off:
+    lda #$80
+    sta PPU_CON1
+    sta PPU_CON2
+    rts
+
+init_vars:
+
+    ; test
+    ; lda #$0d
+    ; sta game_state
+    ; end test
+
+    lda #$3c
+    sta timer_low
+    lda #$01
+    sta current_map
+    lda #$2a
+    sta blinker
+    ;lda #$00           ; uneccesary, already did at beginning
+    ;sta update_blink
+    lda #BLINK_TIME
+    sta blink_timer
+    lda #NPC1_ANIM_TIME
+    sta anim1_timer
+    lda #NPC2_ANIM_TIME
+    sta anim2_timer
+
+
+    ; shouldn't need this, but just checking
+    lda #$00
+    sta need_clear
+
+    ; initialize player's sprite info
+    ; OPTIMIZE - maybe store data in memory, load indirect
+    ; Also, might just init frame and x, y coordinates and 
+    ; let tiles get initialized by other code
+
+    lda #$00
+    sta player_frame
+    sta player_dir
+
+    ; tiles
+    ldx #$01
+    ;stx player_ul_t  ; these already done
+    ;inx 
+    stx player_ur_t
+    inx 
+    stx player_ll_t
+    inx
+    stx player_lr_t
+
+    ; x & y coordinates 
+    lda #$20
+    sta player_ul_y
+    sta player_ur_y
+    sta player_ul_x
+    sta player_ll_x
+
+    lda #$28
+    sta player_ll_y
+    sta player_lr_y
+    sta player_ur_x
+    sta player_lr_x
+
+    jsr update_sprites
+    jsr draw_text_window
+    
+    rts
+
+
+do_title:
+
+    ; set VRAM address
+    lda #$24
+    sta VRAM_ADDR2
+    lda #$00
+    sta VRAM_ADDR2
+
+    ldx #$04
+    ldy #$00
+    lda #<title_screen
+    sta temp1
+    lda #>title_screen
+    sta temp2
+*   lda (temp1),y
+    sta VRAM_DATA
+    iny
+    bne -
+    inc temp2
+    dex
+    bne -
+
+
+    ; do attribute table for map area
+    jsr load_attr_addr
+    jsr wait_vblank
+
+    lda #$27
+    sta VRAM_ADDR2
+    lda #$c0
+    sta VRAM_ADDR2
+    ldy #$00
+    lda #<title_attr
+    sta temp1
+    lda #>title_attr
+    sta temp2
+*   lda (temp1),y 
+    sta VRAM_DATA
+    iny
+    cpy #$28
+    bne -
+
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+    jsr graphics_on
+
+
+do_title_exit:
+*   jsr poll_input
+    lda con1
+    and #START_BUT
+    beq -
+
+    jsr load_silence_music
+    jsr do_fyeah
+
+    jsr graphics_off
+    rts
+
+
+do_ending:
+    jsr graphics_off
+
+    ; clear sprites
+    ldx #$00
+    lda #$ff
+*   sta $0200,x
+    inx
+    cpx #$34
+    bne -
+    jsr update_sprites
+
+    ; load palette
+    lda #$3F
+    ldx #$00
+    sta VRAM_ADDR2
+    stx VRAM_ADDR2
+*   lda ending_pal, x
+    sta VRAM_DATA
+    inx
+    cpx #$20
+    bne -
+
+    ; set VRAM address
+    lda #$24
+    sta VRAM_ADDR2
+    lda #$00
+    sta VRAM_ADDR2
+
+    ldx #$04
+    ldy #$00
+    lda #<ending_screen
+    sta temp1
+    lda #>ending_screen
+    sta temp2
+*   lda (temp1),y
+    sta VRAM_DATA
+    iny
+    bne -
+    inc temp2
+    dex
+    bne -
+
+
+    ; do attribute table for map area
+    jsr load_attr_addr
+    jsr wait_vblank
+
+    lda #$27
+    sta VRAM_ADDR2
+    lda #$c0
+    sta VRAM_ADDR2
+    ldy #$00
+    lda #<ending_attr
+    sta temp1
+    lda #>ending_attr
+    sta temp2
+*   lda (temp1),y 
+    sta VRAM_DATA
+    iny
+    cpy #$40
+    bne -
+
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+    jsr load_end_music
+    jsr graphics_on
+
+
+do_ending_exit:
+    jmp do_ending_exit
+    rts
+
+draw_map:
+    ; for some reason, trying to load map_addr and 
+    ; attr_addr separately causes problems - doing one 
+    ; followed by the other before redrawing the map makes only
+    ; the one which was last written valid - no clue why this 
+    ; happens, try to find out
+    jsr load_map_addr
+    jsr wait_vblank
+
+    ; set VRAM address
+    lda #$24
+    sta VRAM_ADDR2
+    lda #$00
+    sta VRAM_ADDR2
+
+    ldx #$02
+    ldy #$00
+    lda <map_addr
+    sta temp1
+    lda >map_addr
+    sta temp2
+*   lda (temp1),y
+    sta VRAM_DATA
+    iny
+    bne -
+    inc temp2
+    dex
+    bne -
+
+    ; get last 128 bytes
+    ldy #$00
+*   lda (temp1),y
+    sta VRAM_DATA
+    iny
+    cpy #$80
+    bne -
+
+    ; do attribute table for map area
+    jsr load_attr_addr
+    jsr wait_vblank
+
+    lda #$27
+    sta VRAM_ADDR2
+    lda #$c0
+    sta VRAM_ADDR2
+    ldy #$00
+    ;lda #<attr_data
+    lda <attr_addr
+    sta temp1
+    ;lda #>attr_data
+    lda >attr_addr
+    sta temp2
+*   lda (temp1),y 
+    sta VRAM_DATA
+    iny
+    cpy #$28
+    bne -
+
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+    rts
+
+
+draw_text_window:
+    ; Also clears text from window
+
+    ; start at $2680 in VRAM
+
+    lda #$26    
+    sta VRAM_ADDR2
+    lda #$80
+    sta VRAM_ADDR2      
+
+    ; load top of window
+
+    lda #$60            ; upper left corner
+    sta VRAM_DATA
+    lda #$66            ; upper bar
+    ldx #$1e            ; space is 30 lines across
+*   sta VRAM_DATA
+    dex
+    bne -
+    lda #$62            ; upper right corner
+    sta VRAM_DATA
+
+    ; load middle part of window
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+    jsr wait_vblank
+
+    ldy #$07            ; do same line 4 times
+*   lda #$64            ; left side of window
+    sta VRAM_DATA
+    lda #$40            ; empty space
+    ldx #$1e            ; space is 30 lines across
+*   sta VRAM_DATA
+    dex
+    bne -
+    lda #$65            ; right side of window
+    sta VRAM_DATA
+    dey
+    bne --
+    
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+    jsr wait_vblank
+    
+    ; load bottom of window
+
+    lda #$61            ; lower left corner
+    sta VRAM_DATA
+    lda #$67            ; lower bar
+    ldx #$1e            ; space is 30 lines across
+*   sta VRAM_DATA
+    dex
+    bne -
+    lda #$63            ; lower right corner
+    sta VRAM_DATA
+
+
+    ; for the heck of it, clear the bottom (invisible in
+    ; NTSC, I think) part of the window
+    ; may want to remove this later
+    ldx #$20            
+    lda #$40
+*   sta VRAM_DATA
+    dex
+    bne -
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+
+    rts
+    
+
+
+update_sprites:
+    jsr wait_vblank
+
+    lda #>sprites
+    sta SPR_DMA
+    rts
+
+poll_input:
+    ; strobe joystick
+    lda con1
+    sta temp1
+    ldx #$01
+    stx GAMEPORT1
+    dex
+    stx GAMEPORT1
+
+    ; store status of controller in con1
+    ldx #$08
+*   lda GAMEPORT1
+    lsr
+    rol con1
+    
+    dex
+    bne -
+
+    lda con1
+    cmp temp1
+    beq +
+    
+
+*   rts 
+
+
+debug_button:
+    lda con1
+    and #B_BUT
+    beq +
+
+    lda game_state
+    ldx #$01
+    stx debug_index
+    jsr debug_print
+
+    lda need_clear
+    ldx #$04
+    stx debug_index
+    jsr debug_print
+
+    lda player_ul_y
+    ldx #$07
+    stx debug_index
+    jsr debug_print
+
+    lda player_ul_x
+    ldx #$0a
+    stx debug_index
+    jsr debug_print
+
+    lda current_map
+    ldx #$0d
+    stx debug_index
+    jsr debug_print
+
+    lda jerry_talk_count
+    ldx #$10
+    stx debug_index
+    jsr debug_print
+
+*   rts
+
+check_action_button:
+    ; check to see if action button is pressed and react if it is    
+
+*   lda con1
+    and #A_BUT
+    bne ++
+    lda #$00
+    sta letgo
+    ; button not pressed - see if waiting for button release
+    ldx need_clear
+    dex
+    bne +
+    inc need_clear      ; need_clear = 2 indicates button released
+                        ; and waiting for it to be pressed again
+
+*   jmp check_action_button_exit
+    
+
+
+*   lda letgo
+    beq +
+    jmp check_action_button_exit
+*   ldx need_clear
+    beq +
+    dex
+    beq check_action_button_exit
+
+    ; need to clear text
+    dec need_clear
+    dec need_clear
+    jsr clear_text
+    lda #$01
+    sta letgo
+
+    jmp check_action_button_exit
+
+    ; check if text messages needed
+*   ldy current_map
+    bne +
+    ; room 0    
+    jsr do_room0_action
+    jmp check_action_button_exit
+
+*   dey
+    bne +
+    ; room 1
+    jsr do_room1_action
+    jmp check_action_button_exit
+
+*   dey
+    bne +
+    ; room 2
+    jsr do_room2_action
+    jmp check_action_button_exit
+
+*   dey
+    bne +
+    ; room 3
+    jsr do_room3_action
+    jmp check_action_button_exit
+
+    ; room 4
+*   jsr do_room4_action
+
+check_action_button_exit:
+    rts
+
+
+do_room0_action:
+    ; check if talking to Jerry
+    lda player_ul_y
+    cmp #$10
+    bcc do_room0_action_card
+    cmp #$18
+    bcs do_room0_action_card
+    lda player_ul_x
+    cmp #$be
+    bcc do_room0_action_card
+    cmp #$cb
+    bcs do_room0_action_card
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room0_action_card
+    ; here means you're in range to talk to Jerry
+    jsr do_jerry_text
+    jmp do_room0_action_inc_clear
+
+    ; check if facing the magic card
+do_room0_action_card:
+    lda player_ul_x
+    cmp #$1e
+    bcc do_room0_action_exit
+    cmp #$24
+    bcs do_room0_action_exit
+    lda player_ul_y
+    cmp #$45
+    bcc do_room0_action_exit
+    cmp #$55
+    bcs do_room0_action_exit
+    lda player_dir
+    cmp #PLAYER_LEFT
+    bne do_room0_action_exit
+    ; here means you're facing the magic card
+    jsr do_card_text
+    jmp do_room0_action_inc_clear
+
+do_room0_action_inc_clear:
+    inc need_clear
+
+do_room0_action_exit:
+    rts
+
+do_room1_action:
+    ; check if talk to John
+    lda player_ul_y
+    cmp #$47
+    bcc do_room1_action_chinese
+    cmp #$51
+    bcs do_room1_action_chinese
+    lda player_ul_x
+    cmp #$18
+    bcc do_room1_action_chinese
+    cmp #$28
+    bcs do_room1_action_chinese
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room1_action_chinese
+    ; here means you're in range to talk to John
+    jsr do_john_text
+    jmp do_room1_action_inc_clear
+
+    ; check if looking at chinese book
+do_room1_action_chinese:
+    lda player_ul_x
+    cmp #$ca
+    bcc do_room1_action_exit
+    cmp #$d1
+    bcs do_room1_action_exit
+    lda player_ul_y
+    cmp #$36
+    bcc do_room1_action_exit
+    cmp #$46
+    bcs do_room1_action_exit
+    lda player_dir
+    cmp #PLAYER_RIGHT
+    bne do_room1_action_exit
+    jsr do_chinese_text
+
+do_room1_action_inc_clear:
+    inc need_clear
+
+do_room1_action_exit:
+    rts
+
+
+do_room2_action:
+    lda player_ul_x
+    cmp #$be
+    bcc do_room2_action_exit
+    cmp #$c4
+    bcs do_room2_action_exit
+    lda player_ul_y
+    cmp #$29
+    bcc do_room2_action_exit
+    cmp #$39
+    bcs do_room2_action_exit
+    lda player_dir
+    cmp #PLAYER_LEFT
+    bne do_room2_action_exit
+    ; if here means you're looking at naruto dvd
+    jsr do_naruto_text
+
+do_room2_action_inc_clear:
+    inc need_clear
+do_room2_action_exit:
+    rts
+
+do_room3_action:
+    ; check if talk to Scott
+    lda player_ul_y
+    cmp #$17
+    bcc do_room3_action_jack
+    cmp #$1e
+    bcs do_room3_action_jack
+    lda player_ul_x
+    cmp #$49
+    bcc do_room3_action_jack
+    cmp #$59
+    bcs do_room3_action_jack
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room3_action_jack
+    ; here means you're in range to talk to Scott
+    jsr do_scott_text
+    jmp do_room3_action_inc_clear
+
+do_room3_action_jack:
+    ; check if talk to Scott
+    lda player_ul_y
+    cmp #$47
+    bcc do_room3_action_exit
+    cmp #$4e
+    bcs do_room3_action_exit
+    lda player_ul_x
+    cmp #$af
+    bcc do_room3_action_exit
+    cmp #$bf
+    bcs do_room3_action_exit
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room3_action_exit
+    ; here means you're in range to talk to Jack
+    jsr do_jack_text
+
+
+do_room3_action_inc_clear:
+    inc need_clear
+do_room3_action_exit:
+    rts
+
+
+do_room4_action:
+    ; check if facing the computer
+    lda player_ul_y
+    cmp #$27
+    bcc do_room4_action_alcohol
+    cmp #$2d
+    bcs do_room4_action_alcohol
+    lda player_ul_x
+    cmp #$a7
+    bcc do_room4_action_alcohol
+    cmp #$d7
+    bcs do_room4_action_alcohol
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room4_action_alcohol
+    ; here means you're in range to talk to the computer
+    jsr do_comp_text
+    jmp do_room4_action_inc_clear
+
+    ; check if facing the beer
+do_room4_action_alcohol:
+    lda player_ul_y
+    cmp #$18
+    bcc do_room4_action_ken
+    cmp #$1e
+    bcs do_room4_action_ken
+    lda player_ul_x
+    cmp #$37
+    bcc do_room4_action_ken
+    cmp #$47
+    bcs do_room4_action_ken
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room4_action_ken
+    ; here means you're in range to talk to Scott
+    jsr do_alcohol_text
+    jmp do_room4_action_inc_clear
+
+    ; check if talk to Ken
+do_room4_action_ken:
+    lda player_ul_y
+    cmp #$6a
+    bcc do_room4_action_alex
+    cmp #$70
+    bcs do_room4_action_alex
+    lda player_ul_x
+    cmp #$1d
+    bcs do_room4_action_alex
+    lda player_dir
+    cmp #PLAYER_DOWN
+    bne do_room4_action_alex
+    ; here means you're in range to talk to Scott
+    jsr do_ken_text
+    jmp do_room4_action_inc_clear
+
+do_room4_action_alex:
+    ; check if talk to Alex
+    lda player_ul_y
+    cmp #$18
+    bcc do_room4_action_exit
+    cmp #$1e
+    bcs do_room4_action_exit
+    lda player_ul_x
+    cmp #$21
+    bcc do_room4_action_exit
+    cmp #$31
+    bcs do_room4_action_exit
+    lda player_dir
+    cmp #PLAYER_UP
+    bne do_room4_action_exit
+    ; here means you're in range to talk to Jack
+    jsr do_alex_text
+
+
+do_room4_action_inc_clear:
+    inc need_clear
+do_room4_action_exit:
+    rts
+
+
+do_jack_text:
+    lda game_state
+    cmp #$09
+    bne +
+    inc game_state
+    lda #<jack_text_9
+    ldx #>jack_text_9
+    jmp do_jack_text_exit
+    
+*   lda #<jack_text_0
+    ldx #>jack_text_0
+
+do_jack_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+
+do_ken_text:
+    lda game_state
+    cmp #$01
+    bcs +
+    lda #<ken_text_0
+    ldx #>ken_text_0
+    jmp do_ken_text_exit
+
+*   cmp #$02
+    bcs +
+    inc game_state
+    lda #<ken_text_1
+    ldx #>ken_text_1
+    jmp do_ken_text_exit
+
+*   cmp #$03
+    bcs +
+    lda #<ken_text_1
+    ldx #>ken_text_1
+    jmp do_ken_text_exit
+
+*   cmp #$06
+    bcs +
+    lda #<ken_text_3
+    ldx #>ken_text_3
+    jmp do_ken_text_exit
+
+*   cmp #$08
+    bcs +
+    lda #<ken_text_6
+    ldx #>ken_text_6
+    jmp do_ken_text_exit
+
+*   cmp #$0b
+    bcs +
+    lda #<ken_text_8
+    ldx #>ken_text_8
+    jmp do_ken_text_exit
+
+
+*   lda #<ken_text_11
+    ldx #>ken_text_11
+
+do_ken_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+
+do_alex_text:
+    lda game_state
+    cmp #$03
+    bcs +
+    lda #<alex_text_0
+    ldx #>alex_text_0
+    jmp do_alex_text_exit
+
+
+*   cmp #$04
+    bcs +
+    lda #<alex_text_3
+    ldx #>alex_text_3
+    jmp do_alex_text_exit
+
+*   cmp #$05
+    bcs +
+    inc game_state
+    lda #<alex_text_4
+    ldx #>alex_text_4
+    jmp do_alex_text_exit
+
+*   cmp #$06
+    bcs +
+    lda #<alex_text_4
+    ldx #>alex_text_4
+    jmp do_alex_text_exit
+
+*   cmp #$08
+    bcs +
+    lda #<alex_text_6
+    ldx #>alex_text_6
+    jmp do_alex_text_exit
+
+*   cmp #$0b
+    bcs +
+    lda #<alex_text_8
+    ldx #>alex_text_8
+    jmp do_alex_text_exit
+
+
+*   lda #<alex_text_11
+    ldx #>alex_text_11
+
+do_alex_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+
+do_scott_text:
+    lda game_state
+    cmp #$03
+    bcs +
+    lda #<scott_text_0
+    ldx #>scott_text_0
+    jmp do_scott_text_exit
+
+*   cmp #$06
+    bcs +
+    lda #<scott_text_3
+    ldx #>scott_text_3
+    jmp do_scott_text_exit
+
+*   cmp #$08
+    bcs +
+    lda #<scott_text_6
+    ldx #>scott_text_6
+    jmp do_scott_text_exit
+
+*   cmp #$0b
+    bcs +
+    lda #<scott_text_8
+    ldx #>scott_text_8
+    jmp do_scott_text_exit
+
+*   cmp #$0c
+    bcs +
+    lda #<scott_text_11
+    ldx #>scott_text_11
+    jmp do_scott_text_exit
+
+*   cmp #$0d
+    bcs +
+    inc game_state
+    lda #<scott_text_12
+    ldx #>scott_text_12
+
+*   lda #<scott_text_12
+    ldx #>scott_text_12
+
+do_scott_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+
+do_john_text:
+    lda game_state
+    cmp #$03
+    bcs +
+    lda #<john_text_0
+    ldx #>john_text_0
+    jmp do_john_text_exit
+
+*   cmp #$06
+    bcs +
+    lda #<john_text_3
+    ldx #>john_text_3
+    jmp do_john_text_exit
+
+*   cmp #$08
+    bcs +
+    lda #<john_text_6
+    ldx #>john_text_6
+    jmp do_john_text_exit
+
+*   cmp #$0b
+    bcs +
+    lda #<john_text_8
+    ldx #>john_text_8
+    jmp do_john_text_exit
+
+*   lda #<john_text_11
+    ldx #>john_text_11
+
+do_john_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+
+do_jerry_text:
+    lda game_state
+    cmp #$03
+    bcs +
+    lda #<jerry_text_0
+    ldx #>jerry_text_0
+    jmp do_jerry_text_exit
+
+*   cmp #$06
+    bcs +
+    lda #<jerry_text_3
+    ldx #>jerry_text_3
+    jmp do_jerry_text_exit
+
+*   cmp #$07
+    bcs ++
+    lda jerry_talk_count
+    beq +
+    dec jerry_talk_count
+    lda #<jerry_text_6
+    ldx #>jerry_text_6
+    jmp do_jerry_text_exit
+
+*   inc game_state 
+    lda game_state
+
+*   cmp #$08
+    bcs +
+    lda #<jerry_text_7
+    ldx #>jerry_text_7
+    jmp do_jerry_text_exit
+
+
+*   cmp #$0a
+    bcs +
+    lda #<jerry_text_8
+    ldx #>jerry_text_8
+    jmp do_jerry_text_exit
+
+*   cmp #$0b 
+    bcs +
+    inc game_state
+    lda #<jerry_text_10
+    ldx #>jerry_text_10
+    jmp do_jerry_text_exit
+
+*   lda #<jerry_text_11
+    ldx #>jerry_text_11
+
+do_jerry_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+do_comp_text:
+    lda game_state
+    cmp #$02
+    bcs +
+    lda #<comp_text_0
+    ldx #>comp_text_0
+    jmp do_comp_text_exit
+
+*   cmp #$03
+    bcs +
+    inc game_state
+    lda #<comp_text_2
+    ldx #>comp_text_2
+    jmp do_comp_text_exit
+
+*   cmp #$05
+    bcs +
+    lda #<comp_text_3
+    ldx #>comp_text_3
+    jmp do_comp_text_exit
+
+*   cmp #$06
+    bcs +
+    inc game_state
+    lda #<comp_text_5
+    ldx #>comp_text_5
+    jmp do_comp_text_exit
+
+*   cmp #$07
+    bcs +
+    lda #<comp_text_6
+    ldx #>comp_text_6
+    jmp do_comp_text_exit
+
+*   cmp #$08
+    bcs +
+    inc game_state
+    lda #<comp_text_7
+    ldx #>comp_text_7
+    jmp do_comp_text_exit
+
+*   cmp #$0b
+    bcs +
+    lda #<comp_text_8
+    ldx #>comp_text_8
+    jmp do_comp_text_exit
+
+*   cmp #$0d
+    bcs +
+    lda #<comp_text_11
+    ldx #>comp_text_11
+    jmp do_comp_text_exit
+
+*   inc game_state
+    lda #<comp_text_13
+    ldx #>comp_text_13
+
+do_comp_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+    rts
+
+
+do_card_text:
+    lda game_state
+    bne +
+    inc game_state
+    lda #$ff
+    sta item1_t
+    lda #<sakura_text
+    ldx #>sakura_text
+
+do_card_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+*   rts
+
+
+do_chinese_text:
+    lda game_state
+    cmp #$08
+    bcs +
+    lda #<before_use_text
+    ldx #>before_use_text
+    jmp do_chinese_text_exit
+*   bne +
+    inc game_state
+    lda #$ff
+    sta item1_t
+    lda #<chinese_text
+    ldx #>chinese_text
+
+do_chinese_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+*   rts
+
+
+do_naruto_text:
+    lda game_state
+    cmp #$03
+    bcs +
+    lda #<before_use_text
+    ldx #>before_use_text
+    jmp do_naruto_text_exit
+*   bne +
+    inc game_state
+    lda #$ff
+    sta item1_t
+    lda #<naruto_text
+    ldx #>naruto_text
+
+do_naruto_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+*   rts
+
+do_alcohol_text:
+    lda game_state
+    cmp #$0b
+    bcs +
+    lda #<before_use_text
+    ldx #>before_use_text
+    jmp do_alcohol_text_exit
+*   bne +
+    inc game_state
+    lda #$ff
+    sta item1_t
+    lda #<alcohol_text
+    ldx #>alcohol_text
+
+do_alcohol_text_exit:
+    sta arg1
+    stx arg2
+    jsr write_text
+*   rts
+
+
+clear_text:
+    ; clears text in the text window
+    jsr wait_vblank
+    lda #$26
+    sta VRAM_ADDR2
+    lda #$a0
+    sta VRAM_ADDR2
+
+    ldy #$07
+*   lda #$64
+    sta VRAM_DATA
+    lda #$20
+    ldx #$1e
+*   sta VRAM_DATA
+    dex
+    bne -
+    lda #$65
+    sta VRAM_DATA
+    dey
+    bne --
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+    rts
+
+write_text:
+    ; expects arg1 and arg2 to already have
+    ; the address of the text string
+
+    ldy #$00
+    ldx #$80
+
+    jsr wait_vblank
+    lda #$26
+    sta VRAM_ADDR2
+    lda #$a0
+    sta VRAM_ADDR2
+
+;    lda #$00
+;    sta VRAM_ADDR1
+;    sta VRAM_ADDR1
+
+    
+*   lda (arg1),y
+    sta VRAM_DATA
+    iny
+    dex
+    bne -
+
+*   lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+    rts
+
+update_dir:
+    ; update direction from controller press
+    ; OPTIMIZE - might be able to tighten this up a bit
+
+
+
+    lda con1
+    and #UP_BUT
+    beq +
+    lda #$01
+    jmp update_dir_set
+
+*   lda con1
+    and #DOWN_BUT
+    beq +
+    lda #$00
+    jmp update_dir_set
+
+*   lda con1
+    and #LEFT_BUT
+    beq +
+    lda #$03
+    jmp update_dir_set
+
+*   lda con1
+    and #RIGHT_BUT
+    beq update_dir_exit
+    lda #$02
+    jmp update_dir_set
+
+update_dir_set:
+    ; if any buttons pressed, dir is set from A and
+    ; movement is set to 1
+    sta player_dir
+    lda #$01
+    sta player_moving 
+    jmp update_dir_exit
+
+update_dir_exit:
+    rts
+
+
+update_animation:
+    ; check movement variables and update sprite variables
+    ; accordingly
+    lda player_moving
+    beq update_animation_no_toggle    ; don't toggle frames if he isn't moving
+    lda player_frame
+    clc
+    adc #$01
+    jmp update_animation_tile_update
+
+update_animation_no_toggle:
+    lda #$03
+
+update_animation_tile_update:
+    and #$03
+    sta player_frame            
+    cmp #$00        ; animation frame 1
+    bne +           
+    lda #$00
+    jmp update_animation_dir_off
+*   cmp #$02        ; animation frame 2
+    bne +
+    lda #$08
+    jmp update_animation_dir_off
+*   lda #$04
+
+update_animation_dir_off:
+    sta temp1 
+
+    lda player_dir
+    cmp #$00        ; facing down?
+    bne +
+    lda #$00
+    jmp update_animation_set_tiles
+
+*   cmp #$01        ; facing up?
+    bne +
+    lda #$0c
+    jmp update_animation_set_tiles
+
+*   cmp #$02        ; facing right?
+    bne +
+    lda #$18
+    jmp update_animation_set_tiles
+
+*   lda #$18        ; facing left is a special case since we're flipping
+    clc             ; tiles
+    adc temp1
+    sta player_ur_t
+    adc #$01
+    sta player_ul_t
+    adc #$01
+    sta player_lr_t
+    adc #$01
+    sta player_ll_t
+
+    lda player_ul_a ; flip the tiles
+    ora #$40
+    sta player_ul_a
+    lda player_ur_a
+    ora #$40
+    sta player_ur_a
+    lda player_ll_a
+    ora #$40
+    sta player_ll_a
+    lda player_lr_a
+    ora #$40
+    sta player_lr_a
+
+    jmp update_animation_exit
+
+update_animation_set_tiles:
+    
+    clc
+    adc temp1       ; add animation frame offset and update tiles
+    sta player_ul_t
+    adc #$01
+    sta player_ur_t
+    adc #$01
+    sta player_ll_t
+    adc #$01
+    sta player_lr_t
+
+    lda player_ul_a ; make sure no flipping done
+    and #$bf
+    sta player_ul_a
+    lda player_ur_a
+    and #$bf
+    sta player_ur_a
+    lda player_ll_a
+    and #$bf
+    sta player_ll_a
+    lda player_lr_a
+    and #$bf
+    sta player_lr_a
+
+update_animation_exit:
+    rts
+
+
+update_position:
+    ; bug - seems to move faster going left and up than when going
+    ; right 
+    lda player_moving
+    beq update_position_exit
+    ;bne +           ; don't need to do anything if not moving
+    ;rts             ; alternate exit since code is too big - when 
+                     ; the code is optimized, take this out
+
+    ; optimize
+*   lda player_dir
+    cmp #PLAYER_UP
+    bne +
+
+    lda player_ul_y
+    sec
+    sbc #PLAYER_SPEED
+    tax                 ; store y coordinate in X for use downstream
+
+    jmp update_position_y
+
+*   cmp #PLAYER_DOWN
+    bne +
+
+    lda player_ul_y
+    clc
+    adc #PLAYER_SPEED
+    tax                 ; store y coordinate in X for use downstream
+
+    jmp update_position_y
+
+*   cmp #PLAYER_RIGHT
+    bne +
+
+    lda player_ul_x
+    clc
+    adc #PLAYER_SPEED
+    tax                 ; store x coordinate in X for use downstream
+
+    jmp update_position_x
+
+*   lda player_ul_x   ; PLAYER_LEFT
+    sec
+    sbc #PLAYER_SPEED
+    tax                  ; store x coordinate in X for use downstream
+
+update_position_x:
+    txa
+    sta arg1
+    lda player_ul_y
+    sta arg2
+    jsr check_bounds
+    lda ret1
+    beq update_position_exit
+    txa 
+    ldx #$08
+    sta player_ul_x
+    sta player_ul_x,x   ; lower left
+    clc
+    adc #$08
+    sta player_ur_x
+    sta player_ur_x,x   ; lower right
+
+    jmp update_position_exit
+
+update_position_y:
+    txa
+    sta arg2
+    lda player_ul_x
+    sta arg1
+    jsr check_bounds
+    lda ret1
+    beq update_position_exit
+    txa
+    ldx #$04
+    sta player_ul_y
+    sta player_ul_y,x   ; upper right
+    clc
+    adc #$08
+    sta player_ll_y
+    sta player_ll_y,x   ; lower right
+     
+update_position_exit:
+    lda #$00
+    sta player_moving
+    lda #PLAYER_COOLDOWN
+    sta move_cooldown
+    rts
+
+
+check_bounds:
+    ; arg1 = x coordinate
+    ; arg2 = y coordinate
+    ; uses x & y coordinates to create an index into
+    ; the map data to see if coordinates at x,y will be touching anything
+    txa
+    pha
+    jsr load_map_addr
+    lda arg1
+    lsr
+    lsr
+    lsr
+    clc
+;   adc #<map_data
+    adc <map_addr
+    sta temp1
+;    lda #>map_data
+    lda >map_addr
+    adc #$00
+    sta temp2
+    lda arg2
+    and #$f8
+    asl
+    asl
+    clc
+    adc temp1
+    sta temp1
+    lda temp2
+    adc #$00
+    sta temp2
+
+    lda arg2
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc temp2
+    sta temp2
+    ldy #$00
+    lda (temp1),y
+
+    jsr check_solid
+    lda ret1
+    beq check_bounds_return_false
+
+    lda arg1
+    and #$f0
+    beq +
+    ldy #$02
+    lda (temp1),y
+    jsr check_solid
+    lda ret1
+    beq check_bounds_return_false
+*   lda arg2
+    and #$f0
+    beq +
+    lda #$40
+    clc
+    adc temp1
+    sta temp1
+    lda temp2
+    adc #00
+    sta temp2
+    lda (temp1),y
+    jsr check_solid
+    lda ret1
+    beq check_bounds_return_false
+*   ldy #$00
+    lda (temp1),y
+    jsr check_solid
+    lda ret1
+    beq check_bounds_return_false
+
+    ; see if need to move to another room
+    lda arg1
+    cmp #$10
+    bcs +
+    jsr move_room_left
+    jmp check_bounds_return_false
+
+*   cmp #$e0
+    bcc +
+    jsr move_room_right
+    jmp check_bounds_return_false
+
+*   lda arg2
+    cmp #$10
+    bcs +
+    jsr move_room_up
+    jmp check_bounds_return_false
+
+*   cmp #$80
+    bcc check_bounds_return_true
+    jsr move_room_down
+    jmp check_bounds_return_false
+
+
+
+check_bounds_return_true:
+    lda #$01
+    sta ret1
+    pla
+    tax
+    rts
+check_bounds_return_false:
+    lda #$00
+    sta ret1
+    pla
+    tax
+    rts
+
+
+move_room_left:
+    ldy current_map
+    dey 
+    sty current_map
+    lda #$de
+    sta player_ul_x
+    sta player_ll_x
+    lda #$e6
+    sta player_ur_x
+    sta player_lr_x
+    jsr refresh_map
+
+    rts
+
+
+move_room_right:
+    ldy current_map
+    iny 
+    sty current_map
+    lda #$12
+    sta player_ul_x
+    sta player_ll_x
+    lda #$1a
+    sta player_ur_x
+    sta player_lr_x
+    jsr refresh_map
+
+    rts
+
+
+move_room_up:
+    ldy current_map
+    dey 
+    sty current_map
+    lda #$7e
+    sta player_ul_y
+    sta player_ur_y
+    lda #$86
+    sta player_ll_y
+    sta player_lr_y
+    jsr refresh_map
+
+    rts
+
+
+move_room_down:
+    ldy current_map
+    iny 
+    sty current_map
+    lda #$12
+    sta player_ul_y
+    sta player_ur_y
+    lda #$1a
+    sta player_ll_y
+    sta player_lr_y
+    jsr refresh_map
+
+    rts
+
+
+refresh_map:
+    jsr setup_room
+    jsr wait_vblank
+    jsr graphics_off
+    jsr draw_map
+    jsr wait_vblank
+    jsr graphics_on
+    rts
+
+load_map_addr:
+    ; can optimize later if necessary (maps all same size)
+    ldy current_map
+    bne +
+; map 0
+    lda #<map_data_00
+    sta <map_addr
+    lda #>map_data_00
+    sta >map_addr
+    jmp load_map_addr_exit
+
+*   dey 
+    bne +
+; map 1
+    lda #<map_data_01
+    sta <map_addr
+    lda #>map_data_01
+    sta >map_addr
+    jmp load_map_addr_exit
+
+*   dey
+    bne +
+; map 2
+    lda #<map_data_02
+    sta <map_addr
+    lda #>map_data_02
+    sta >map_addr
+    jmp load_map_addr_exit
+
+*   dey
+    bne +
+; map 3
+    lda #<map_data_03
+    sta <map_addr
+    lda #>map_data_03
+    sta >map_addr
+    jmp load_map_addr_exit
+    
+; map 4
+*   lda #<map_data_04
+    sta <map_addr
+    lda #>map_data_04
+    sta >map_addr
+    jmp load_map_addr_exit
+
+load_map_addr_exit:
+    rts
+
+
+load_attr_addr:
+    ; can optimize later if necessary (maps all same size)
+    ldy current_map
+    bne +
+; map 0
+    lda #<attr_data_00
+    sta <attr_addr
+    lda #>attr_data_00
+    sta >attr_addr
+    jmp load_attr_addr_exit
+
+*   dey 
+    bne +
+; map 1
+    lda #<attr_data_01
+    sta <attr_addr
+    lda #>attr_data_01
+    sta >attr_addr
+    jmp load_attr_addr_exit
+
+*   dey
+    bne +
+; map 2
+    lda #<attr_data_02
+    sta <attr_addr
+    lda #>attr_data_02
+    sta >attr_addr
+    jmp load_attr_addr_exit
+
+*   dey
+    bne +
+; map 3
+    lda #<attr_data_03
+    sta <attr_addr
+    lda #>attr_data_03
+    sta >attr_addr
+    jmp load_attr_addr_exit
+    
+; map 4
+*   lda #<attr_data_04
+    sta <attr_addr
+    lda #>attr_data_04
+    sta >attr_addr
+
+load_attr_addr_exit:
+    rts
+
+
+setup_room:
+; these are dumb, straight-forward ways of loading sprites
+; for the rooms. if space is needed later, optimize these
+
+    ; when you leave the room, the number of times you talked 
+    ; to Jerry resets (for seeing when you'll wake him up)
+    ldy #JERRY_COUNT
+    sty jerry_talk_count
+
+    ldy current_map
+    bne +
+    jmp setup_room_0
+*   dey
+    bne +
+    jmp setup_room_1
+*   dey
+    bne +
+    jmp setup_room_2
+*   dey
+    bne +
+    jmp setup_room_3
+*   jmp setup_room_4
+
+
+setup_room_0:
+    ; npc1 is Jerry
+    lda #$0c
+    sta npc1_ul_y
+    sta npc1_ur_y
+    lda #$14
+    sta npc1_ll_y
+    sta npc1_lr_y
+
+    lda #$c0
+    sta npc1_ul_x
+    sta npc1_ll_x
+    lda #$c8
+    sta npc1_ur_x
+    sta npc1_lr_x
+
+    ldx #$24
+    stx npc1_ul_t
+    inx
+    stx npc1_ur_t
+    inx
+    stx npc1_ll_t
+    inx
+    stx npc1_lr_t
+
+    lda #$0c
+    sta tile_toggle_1
+    lda #$00
+    sta tile_toggle_2
+
+    ; no second character
+    ldx #$ff
+    stx npc2_ul_t
+    stx npc2_ur_t
+    stx npc2_ll_t
+    stx npc2_lr_t
+
+    ; item1 is Magic card
+    lda game_state
+    bne +               ; if magic card picked up, don't display
+    lda #$54
+    sta item1_t
+    lda #$17
+    sta item1_x
+    lda #$50
+    sta item1_y
+    bne ++              ; should always be true
+
+*   lda #$ff
+    sta item1_t
+
+    ; default palettes
+*   lda #$02
+    sta npc1_ul_a
+    sta npc1_ur_a
+    sta npc1_ll_a
+    sta npc1_lr_a
+    sta npc2_ul_a
+    sta npc2_ur_a
+    sta npc2_ll_a
+    sta npc2_lr_a
+    sta item1_a
+
+
+    jsr update_sprites
+    jmp setup_room_exit
+
+
+setup_room_1:
+    ; npc1 is John
+    lda #$42
+    sta npc1_ul_y
+    sta npc1_ur_y
+    lda #$4a
+    sta npc1_ll_y
+    sta npc1_lr_y
+
+    lda #$20
+    sta npc1_ul_x
+    sta npc1_ll_x
+    lda #$28
+    sta npc1_ur_x
+    sta npc1_lr_x
+
+    ldx #$4c
+    stx npc1_ul_t
+    inx
+    stx npc1_ur_t
+    inx
+    stx npc1_ll_t
+    inx
+    stx npc1_lr_t
+
+    lda #$1c
+    sta tile_toggle_1
+    lda #$00
+    sta tile_toggle_2
+
+    ; no items or second character
+    ldx #$ff
+    stx npc2_ul_t
+    stx npc2_ur_t
+    stx npc2_ll_t
+    stx npc2_lr_t
+
+    ; item1 is Chinese dictionary
+    lda game_state
+    cmp #$09
+    bcs +           ; don't load dictionary if picked up already
+    lda #$56
+    sta item1_t
+    lda #$42
+    sta item1_y
+    lda #$e2
+    sta item1_x
+    bne ++          ; should always be true
+
+*   lda #$ff
+    sta item1_t     ; sets empty tile
+    
+    ; palettes
+
+*   lda #$03
+    sta npc1_ul_a
+    sta npc1_ur_a
+    sta npc1_ll_a
+    sta npc1_lr_a
+    sta npc2_ul_a
+    sta npc2_ur_a
+    sta npc2_ll_a
+    sta npc2_lr_a
+    sta item1_a
+
+
+    jsr update_sprites
+    jmp setup_room_exit
+
+
+setup_room_2:
+    ; no characters
+    lda #$ff
+    sta npc1_ul_t
+    sta npc1_ur_t
+    sta npc1_ll_t
+    sta npc1_lr_t
+    sta npc2_ul_t
+    sta npc2_ur_t
+    sta npc2_ll_t
+    sta npc2_lr_t
+
+    ; item1 is naruto dvd
+    lda game_state
+    cmp #$04
+    bcs +               ; don't load if tile is already picked up
+    lda #$55
+    sta item1_t
+    lda #$b6
+    sta item1_x
+    lda #$34
+    sta item1_y
+    bne ++              ; should always be true
+
+*   lda #$ff            ; blank out tile
+    sta item1_t
+
+*   lda #$00
+    sta tile_toggle_1
+    sta tile_toggle_2
+
+    ; palettes
+
+    lda #$03
+    sta npc1_ul_a
+    sta npc1_ur_a
+    sta npc1_ll_a
+    sta npc1_lr_a
+    sta npc2_ul_a
+    sta npc2_ur_a
+    sta npc2_ll_a
+    sta npc2_lr_a
+    sta item1_a
+
+
+    jsr update_sprites
+    jmp setup_room_exit
+
+
+setup_room_3:
+    ; npc1 is Jack
+    lda #$42
+    sta npc1_ul_y
+    sta npc1_ur_y
+    lda #$4a
+    sta npc1_ll_y
+    sta npc1_lr_y
+
+    lda #$b8
+    sta npc1_ul_x
+    sta npc1_ll_x
+    lda #$c0
+    sta npc1_ur_x
+    sta npc1_lr_x
+
+    ldx #$3c
+    stx npc1_ul_t
+    inx
+    stx npc1_ur_t
+    inx
+    stx npc1_ll_t
+    inx
+    stx npc1_lr_t
+
+    ; npc2 is Scott
+    lda #$12
+    sta npc2_ul_y
+    sta npc2_ur_y
+    lda #$1a
+    sta npc2_ll_y
+    sta npc2_lr_y
+
+    lda #$50
+    sta npc2_ul_x
+    sta npc2_ll_x
+    lda #$58
+    sta npc2_ur_x
+    sta npc2_lr_x
+
+    ldx #$44
+    stx npc2_ul_t
+    inx
+    stx npc2_ur_t
+    inx
+    stx npc2_ll_t
+    inx
+    stx npc2_lr_t
+
+    ; no items
+    lda #$ff
+    sta item1_t
+
+    lda #$7c
+    sta tile_toggle_1
+    lda #$0c
+    sta tile_toggle_2
+
+    ; palettes
+
+    lda #$01
+    sta npc1_ul_a
+    sta npc1_ur_a
+    sta npc1_ll_a
+    sta npc1_lr_a
+    lda #$02
+    sta npc2_ul_a
+    sta npc2_ur_a
+    sta npc2_ll_a
+    sta npc2_lr_a
+    sta item1_a
+
+    jsr update_sprites
+    jmp setup_room_exit
+
+
+setup_room_4:
+    ; npc1 is Alex
+    lda #$12
+    sta npc1_ul_y
+    sta npc1_ur_y
+    lda #$1a
+    sta npc1_ll_y
+    sta npc1_lr_y
+
+    lda #$28
+    sta npc1_ul_x
+    sta npc1_ll_x
+    lda #$30
+    sta npc1_ur_x
+    sta npc1_lr_x
+
+    ldx #$2c
+    stx npc1_ul_t
+    inx
+    stx npc1_ur_t
+    inx
+    stx npc1_ll_t
+    inx
+    stx npc1_lr_t
+
+    ; npc2 is Ken
+    lda #$7e
+    sta npc2_ul_y
+    sta npc2_ur_y
+    lda #$86
+    sta npc2_ll_y
+    sta npc2_lr_y
+
+    lda #$10
+    sta npc2_ul_x
+    sta npc2_ll_x
+    lda #$18
+    sta npc2_ur_x
+    sta npc2_lr_x
+
+    ldx #$34
+    stx npc2_ul_t
+    inx
+    stx npc2_ur_t
+    inx
+    stx npc2_ll_t
+    inx
+    stx npc2_lr_t
+
+    ; item1 is beer
+    lda game_state
+    cmp #$0c
+    bcs +               ; don't load if picked up
+    lda #$57
+    sta item1_t
+    lda #$0c
+    sta item1_y
+    lda #$44
+    sta item1_x
+    bne ++              ; should always be true
+
+*   lda #$ff
+    sta item1_t         ; blank out tile
+
+
+*   lda #$1c
+    sta tile_toggle_1
+    lda #$0c
+    sta tile_toggle_2
+
+    ; palettes
+    lda #$03
+    sta npc1_ul_a
+    sta npc1_ur_a
+    sta npc1_ll_a
+    sta npc1_lr_a
+    lda #$01
+    sta npc2_ul_a
+    sta npc2_ur_a
+    sta npc2_ll_a
+    sta npc2_lr_a
+    sta item1_a
+
+
+    jsr update_sprites
+    jmp setup_room_exit
+
+    
+setup_room_exit:
+    rts
+
+
+
+check_solid:
+    ; return true when not solid (confusing, but avoids rewriting some stuff)
+    sec
+    sbc #$70
+    tax
+    lda solid_tiles,x
+    bne check_solid_false
+
+check_solid_true:
+    lda #01
+    jmp check_solid_exit
+
+check_solid_false:
+    ; a already 0 no need to do anything
+    lda #$00
+
+
+check_solid_exit:
+    sta ret1
+    rts
+    
+
+; prints what's in the accumulator
+; uses debug_index to decide where to print it
+debug_print:
+    php
+    sta debug3
+    and #$0f
+    clc
+    adc #$30
+    cmp #$3a
+    bcc +
+    adc #$06
+    
+
+*   sta debug1
+    lda debug3
+    lsr
+    lsr
+    lsr
+    lsr
+    and #$0f
+    clc
+    adc #$30
+    cmp #$3a
+    bcc +
+    adc #$06
+    
+*   sta debug2
+    jsr wait_vblank
+    lda #$26
+    sta VRAM_ADDR2
+    lda #$a1
+    clc
+    adc debug_index
+    sta VRAM_ADDR2
+    lda debug2
+    sta VRAM_DATA
+    lda debug1
+    sta VRAM_DATA
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+    lda debug3
+    plp
+    rts
+
+
+do_fyeah:
+    lda #<fyeah
+    sta temp1
+    lda #>fyeah
+    sta temp2
+
+    ldx #$14
+    ldy #$00
+*   lda (temp1),y
+    sta DELTA_DA
+    jsr snd_delay
+    iny
+    bne -
+    inc temp2
+    dex
+    bne -
+    rts
+
+
+snd_delay:
+    txa
+    ldx #$54
+*   dex
+    bne -
+    tax
+    rts
+
+
+init_sound:
+    lda #$0f
+    sta $4015
+    lda #$00
+    sta $4001
+    sta $4005
+    lda #$40
+    sta $4017
+    rts
+
+
+update_square1:
+    ; mus_counter
+
+
+    ldy #$00
+    lda (sqw1_1),y
+    sta $4000
+    iny
+    lda (sqw1_1),y
+    tax
+    lda square_notes,x
+    sta $4002
+    iny 
+    inx 
+    lda (sqw1_1),y
+    ora square_notes,x
+    sta $4003
+
+    iny
+    lda (sqw1_1),y
+    sta mus_timer_1
+    clc
+    lda sqw1_1
+    adc #$04
+    sta sqw1_1
+    lda sqw1_2
+    adc #$00
+    sta sqw1_2
+    ldy #$00
+    lda (sqw1_1),y
+    cmp #$ff
+    bne update_square1_exit
+    lda sqw1_b1
+    sta sqw1_1
+    lda sqw1_b2
+    sta sqw1_2
+
+update_square1_exit:
+    rts
+
+update_square2:
+    ; mus_counter
+
+    ldy #$00
+    lda (sqw2_1),y
+    sta $4004
+    iny
+    lda (sqw2_1),y
+    tax
+    lda square_notes,x
+    sta $4006
+    iny
+    inx
+    lda (sqw2_1),y
+    ora square_notes,x
+    sta $4007
+
+    iny
+    lda (sqw2_1),y
+    sta mus_timer_2
+    clc
+    lda sqw2_1
+    adc #$04
+    sta sqw2_1
+    lda sqw2_2
+    adc #$00
+    sta sqw2_2
+    ldy #$00
+    lda (sqw2_1),y
+    cmp #$ff
+    bne update_square2_exit
+    lda sqw2_b1
+    sta sqw2_1
+    lda sqw2_b2
+    sta sqw2_2
+
+update_square2_exit:
+    rts
+
+
+update_triangle:
+    ; mus_counter
+
+    ldy #$00
+    lda (tri_1),y
+    sta $4008
+    iny
+    lda (tri_1),y
+    tax
+    lda triangle_notes,x
+    sta $400a
+    iny
+    inx
+    lda (tri_1),y
+    ora triangle_notes,x
+    sta $400b
+
+    iny
+    lda (tri_1),y
+    sta mus_timer_3
+    clc
+    lda tri_1
+    adc #$04
+    sta tri_1
+    lda tri_2
+    adc #$00
+    sta tri_2
+    ldy #$00
+    lda (tri_1),y
+    cmp #$ff
+    bne update_triangle_exit
+    lda tri_b1
+    sta tri_1
+    lda tri_b2
+    sta tri_2
+
+update_triangle_exit:
+    rts
+
+
+update_noise:
+
+    ldy #$00
+    lda (noise_1),y
+    sta $400c
+    iny
+    lda (noise_1),y
+    sta $400e
+    iny
+    lda (noise_1),y
+    sta $400f
+    iny
+    lda (noise_1),y
+    sta mus_timer_4
+    clc
+    lda noise_1
+    adc #$04
+    sta noise_1
+    lda noise_2
+    adc #$00
+    sta noise_2
+    ldy #$00
+    lda (noise_1),y
+    cmp #$ff
+    bne update_noise_exit
+    lda noise_b1
+    sta noise_1
+    lda noise_b2
+    sta noise_2
+
+
+update_noise_exit:
+    rts
+
+
+
+
+
+
+palette:
+      ; text box      ; floor & wall  ; desk, table   ; computer 
+.byte $0f,$00,$10,$20,$0f,$20,$11,$21,$0f,$28,$18,$1a,$0f,$0c,$2a,$0c 
+     
+.byte $0f,$0e,$37,$06,$0f,$0e,$27,$37,$0f,$0e,$37,$19,$0f,$0e,$20,$0c
+
+
+
+;      0123456789012345678901234567890
+      ;JOHN: 
+      ; 64 & 65 are the sides of the text box - saves reloading the PPU
+      ; address repeatedly but takes extra space - remove if needed
+john_text_0:
+      ;01234567890123456789012345678901
+.byte $64
+.byte "JOHN: WHAT IS THIS POLYNOMIAL "
+.byte $65,$64
+.byte "TIME BUBBLE SORT SHIT? FIND A "
+.byte $65,$64
+.byte "BETTER ALGORITHM FOR E.I. OR  "
+.byte $65,$64
+.byte "YOU ARE FIRED.                "
+.byte $65
+
+john_text_3:
+.byte $64
+.byte "JOHN: E.I. NEEDS A PIC. FIND  "
+.byte $65,$64
+.byte "ONE OR FIND ANOTHER JOB.      "
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+john_text_6:
+.byte $64
+.byte "JOHN: THE BETA AMPLITUDE GAIN "
+.byte $65,$64
+.byte "UNIT HAS AN ERROR. FIX IT.    "
+.byte $65,$64
+.byte "ALTERNATIVELY, DEVISE A NEW   "
+.byte $65,$64
+.byte "PLAN TO FEED YOUR FAMILY.     "
+.byte $65
+
+john_text_8:
+.byte $64
+.byte "JOHN: JERRY IS GARBAGE. FIND A"
+.byte $65,$64
+.byte "DISCREET WAY TO END HIS LIFE. "
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+john_text_11:
+.byte $64
+.byte "JOHN: YOUR FINAL TASK IS TO   "
+.byte $65,$64
+.byte "GET A LABVIEW PROGRAM TO DO   "
+.byte $65,$64
+.byte "YOUR JOB SO WE NO LONGER HAVE "
+.byte $65,$64
+.byte "TO PAY YOU.                   "
+.byte $65
+
+jerry_text_0:
+.byte $64
+.byte "JERRY: I AM WORRIED THAT JOHN "
+.byte $65,$64
+.byte "MAY BE TRYING TO KILL ME. DO  " 
+.byte $65,$64
+.byte "YOU THINK I AM BEING PARANOID?"
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jerry_text_3:
+.byte $64
+.byte "JERRY: HERE IN MY SECRET      "
+.byte $65,$64
+.byte "CORNER, NO ONE CAN TELL HOW   " 
+.byte $65,$64
+.byte "USELESS I TRULY AM.           "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jerry_text_6:
+.byte $64
+.byte "JERRY: ZZZ...                 "
+.byte $65,$64
+.byte "                              " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jerry_text_7:
+.byte $64
+.byte "JERRY: LEAVE ME BE! USE THIS  "
+.byte $65,$64
+.byte "CIRCUIT TO FIX THE BETA       " 
+.byte $65,$64
+.byte "AMPLITUDE GAIN UNIT.          "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jerry_text_8:
+.byte $64
+.byte "JERRY: I SURE DO LIKE BEING   "
+.byte $65,$64
+.byte "ALIVE. THE BEST THING ABOUT IT" 
+.byte $65,$64
+.byte "IS FRIENDS WHO WOULD NEVER    "
+.byte $65,$64
+.byte "MURDER YOU EVEN IF JOHN ASKED."
+.byte $65
+
+jerry_text_10:
+.byte $64
+.byte "JERRY: I GUESS YOU ARE HERE TO"
+.byte $65,$64
+.byte "KILL ME. MAKE IT SWIFT,       " 
+.byte $65,$64
+.byte "FRIEND.                       "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jerry_text_11:
+.byte $64
+.byte "JERRY: DUE TO BUDGET CUTS     "
+.byte $65,$64
+.byte "THERE IS NO DEATH ANIMATION,  " 
+.byte $65,$64
+.byte "BUT I ASSURE YOU I AM DEAD.   "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+ken_text_0:
+.byte $64
+.byte "KEN: ZOMG! BLUE RED! BEAT DOWN"
+.byte $65,$64
+.byte "CONTROL ON THE SIDEBOARD FOR  " 
+.byte $65,$64
+.byte "METAGAME WITH...WITH...W..WH.."
+.byte $65,$64
+.byte "..WHERE AM I?                 "
+.byte $65
+
+ken_text_1:
+.byte $64
+.byte "KEN: SAKURA TRIBE ELDER? MY   "
+.byte $65,$64
+.byte "FAVORITE! HERE, USE THIS QUICK" 
+.byte $65,$64
+.byte "SORT ON THE COMPUTER...N LOG N"
+.byte $65,$64
+.byte "OVERPOWERED NERF IN THE PATCH."
+.byte $65
+
+ken_text_3:
+.byte $64
+.byte "KEN: ALEX LIKES HIS ANIME, I  "
+.byte $65,$64
+.byte "CAN SAY THAT MUCH. SAY, I     " 
+.byte $65,$64
+.byte "THOUGHT DAN WAS SUPPOSED TO BE"
+.byte $65,$64
+.byte "IN THIS GAME?                 "
+.byte $65
+
+
+ken_text_6:
+.byte $64
+.byte "KEN: SEWER RAT MAY TASTE LIKE "
+.byte $65,$64
+.byte "PUMPKIN PIE BUT I WOULD NEVER " 
+.byte $65,$64
+.byte "KNOW CAUSE I WOULD NOT EAT THE"
+.byte $65,$64
+.byte "FILTHY MOTHER FUCKER.         "
+.byte $65
+
+ken_text_8:
+.byte $64
+.byte "KEN: COUNT ME AMONG THE MANY  "
+.byte $65,$64
+.byte "WHO WOULD PAY GOOD MONEY TO   " 
+.byte $65,$64
+.byte "WATCH JERRY FALL IN A HOLE AND"
+.byte $65,$64
+.byte "DIE.                          "
+.byte $65
+
+
+ken_text_11:
+.byte $64
+.byte "KEN: WHO WANTS A BODY MASSAGE?"
+.byte $65,$64
+.byte "                              " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+alex_text_0:
+.byte $64
+.byte "ALEX: NORTHWEST MOST ROOM IS  "
+.byte $65,$64
+.byte "THE SECRET.                   " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+alex_text_3:
+.byte $64
+.byte "ALEX: I WOULD GIVE YOU A PIC  "
+.byte $65,$64
+.byte "BUT I AM TOO DEPRESSED. I LOST" 
+.byte $65,$64
+.byte "WHAT IS DEAR TO ME.           "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+alex_text_4:
+.byte $64
+.byte "ALEX: YOU FOUND MY NARUTO DVD?"
+.byte $65,$64
+.byte "THANKS! HERE IS A PIC. USE IT " 
+.byte $65,$64
+.byte "ON THE COMPUTER, AS THIS IS A "
+.byte $65,$64
+.byte "REALISTIC THING TO DO.        "
+.byte $65
+
+alex_text_6:
+.byte $64
+.byte "ALEX: I HAVE TO SPEAK TO JERRY"
+.byte $65,$64
+.byte "MANY TIMES TO WAKE HIM FROM   " 
+.byte $65,$64
+.byte "SLEEPING. DAMN JERRY...       "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+alex_text_8:
+.byte $64
+.byte "ALEX: THE CHINESE KNOW MANY   "
+.byte $65,$64
+.byte "MURDER SECRETS. THEY SHOULD   " 
+.byte $65,$64
+.byte "USE THEM ON JERRY BECAUSE WE  "
+.byte $65,$64
+.byte "ALL HATE HIM.                 "
+.byte $65
+
+alex_text_11:
+.byte $64
+.byte "ALEX: BODY MASSAGE MACHINE GO!"
+.byte $65,$64
+.byte "                              " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jack_text_0:
+.byte $64
+.byte "JACK: ;<=>><;=??? ;==><>;>!!! "
+.byte $65,$64
+.byte "=>>;;<>....                   " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+jack_text_9:
+.byte $64
+.byte "JACK: USE THIS MURDER SECRET  "
+.byte $65,$64
+.byte "TO ELIMINATE JERRY. GO        " 
+.byte $65,$64
+.byte "SWIFTLY, LIKE THE TIGER BORN  "
+.byte $65,$64
+.byte "OF A VIRTUOUS EAGLE!          "
+.byte $65
+
+scott_text_0:
+.byte $64
+.byte "SCOTT: CHUCK, I WANT TO DRIVE "
+.byte $65,$64
+.byte "YOUR CAR. I HOPE YOU WILL GIVE" 
+.byte $65,$64
+.byte "ME PERMISSION. WELL, I WILL BE"
+.byte $65,$64
+.byte "WAITING FOR YOUR RESPONSE.    "
+.byte $65
+
+scott_text_3:
+.byte $64
+.byte "SCOTT: YO QUIERO UN BURRITO,  "
+.byte $65,$64
+.byte "NO FRIJOLES AL DENTE. GRACIAS " 
+.byte $65,$64
+.byte "Y BUENOS NOCHES, AMIGO...     "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+
+scott_text_6:
+.byte $64
+.byte "SCOTT: SO YOU SEE, THIS PEPSI "
+.byte $65,$64
+.byte "IS LIKE THE SPACE TIME        " 
+.byte $65,$64
+.byte "CONTINUUM, AND THIS SANDWICH  "
+.byte $65,$64
+.byte "REPRESENTS NEWTONIAN PHYSICS. "
+.byte $65
+
+
+scott_text_8:
+.byte $64
+.byte "SCOTT: I CANNOT UNDERSTAND    "
+.byte $65,$64
+.byte "JACK SINCE HE RETURNED FROM   " 
+.byte $65,$64
+.byte "THE ORIENT WITHOUT MY CHINESE "
+.byte $65,$64
+.byte "DICTIONARY.                   "
+.byte $65
+
+scott_text_11:
+.byte $64
+.byte "SCOTT: SOME WHISKEY WOULD HIT "
+.byte $65,$64
+.byte "THE SPOT RIGHT ABOUT NOW...   " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+
+scott_text_12:
+.byte $64
+.byte "SHCOTT: AHH...BEING DRUNK     "
+.byte $65,$64
+.byte "HELPSH ME PROGRAM. TAKE THISH " 
+.byte $65,$64
+.byte "LABVIEW CODE TO THE COMPUTER  "
+.byte $65,$64
+.byte "TO BEAT THE GAME.             "
+.byte $65
+
+
+
+comp_text_0:
+.byte $64
+.byte "COMPUTER: ESTIMATED SORT TIME:"
+.byte $65,$64
+.byte "5 LIFETIMES OF THE UNIVERSE   " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+comp_text_2:
+.byte $64
+.byte "COMPUTER: ESTIMATED SORT TIME:"
+.byte $65,$64
+.byte "5 MINUTES AGO.                " 
+.byte $65,$64
+.byte "QUICKSORT...IT IS THAT GOOD.  "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+comp_text_3:
+.byte $64
+.byte "COMPUTER: SORRY. I KNOW       "
+.byte $65,$64
+.byte "NOTHING. IF THIS WERE AN      " 
+.byte $65,$64
+.byte "ACTION GAME I WOULD TURN INTO "
+.byte $65,$64
+.byte "A BAT AND DAMAGE YOU.         "
+.byte $65
+
+comp_text_5:
+.byte $64
+.byte "COMPUTER: AH A TASTY MICROCHIP"
+.byte $65,$64
+.byte "PIC. 18F452, MY FAVORITE!     " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+comp_text_6:
+.byte $64
+.byte "COMPUTER: I AM ERROR.         "
+.byte $65,$64
+.byte "                              " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+comp_text_7:
+.byte $64
+.byte "COMPUTER: B.A.G.U. IS MY      "
+.byte $65,$64
+.byte "PROGRAM NAME. SHOW MY OUTPUT  " 
+.byte $65,$64
+.byte "TO RIVER MAN. JUST KIDDING,   "
+.byte $65,$64
+.byte "GO TALK TO JOHN AGAIN.        "
+.byte $65
+
+comp_text_8:
+.byte $64
+.byte "COMPUTER: EVEN I SOMEHOW HATE "
+.byte $65,$64
+.byte "JERRY, AND I AM NOTHING MORE  " 
+.byte $65,$64
+.byte "THAN AN EMOTIONLESS PIECE OF  "
+.byte $65,$64
+.byte "ELECTRONICS.                  "
+.byte $65
+
+comp_text_11:
+.byte $64
+.byte "COMPUTER: PORK CHOP           "
+.byte $65,$64
+.byte "SANDWICHES!                   " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+comp_text_13:
+.byte $64
+.byte "COMPUTER: THE JOURNEY ENDS    "
+.byte $65,$64
+.byte "HERE. THANK YOU FOR PLAYING   " 
+.byte $65,$64
+.byte "THIS TERRIBLE GAME!           "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+
+before_use_text:
+.byte $64
+.byte "CHUCK: I SUPPOSE I CANNOT USE "
+.byte $65,$64
+.byte "THIS YET. I SHOULD TRY LATER. " 
+.byte $65,$64
+.byte "                              "
+.byte $65,$64
+.byte "                              "
+.byte $65
+
+
+sakura_text:
+.byte $64
+.byte "CHUCK: I FOUND THE SAKURA     "
+.byte $65,$64
+.byte "TRIBE ELDER CARD. THIS WOULD  " 
+.byte $65,$64
+.byte "BE USEFUL, IF I PLANNED TO    "
+.byte $65,$64
+.byte "LIVE A LIFE OF CELIBACY.      "
+.byte $65
+
+naruto_text:
+.byte $64
+.byte "CHUCK: I FOUND THE NARUTO DVD,"
+.byte $65,$64
+.byte "A HEARTWARMING STORY OF A BOY " 
+.byte $65,$64
+.byte "WHO REFUSES TO ACKNOWLEDGE HIS"
+.byte $65,$64
+.byte "HIS STATUS AS A FAILURE.      "
+.byte $65
+
+chinese_text:
+.byte $64
+.byte "CHUCK: I FOUND THE CHINESE    "
+.byte $65,$64
+.byte "DICTIONARY. NOW I CAN         " 
+.byte $65,$64
+.byte "UNDERSTAND JACKS SPEECH, BUT  "
+.byte $65,$64
+.byte "NOT HIS WAY OF LIFE.          "
+.byte $65
+
+
+
+alcohol_text:
+.byte $64
+.byte "CHUCK: I FOUND THE BOTTLE OF  "
+.byte $65,$64
+.byte "JIM BEAM. JUST THE THING I    " 
+.byte $65,$64
+.byte "NEED TO GIVE ME THE COURAGE TO"
+.byte $65,$64
+.byte "MAKE IT THROUGH THE DAY.      "
+.byte $65
+
+
+
+
+map_data:
+
+map_data_00:
+.include "map_data_00.p65"
+map_data_01:
+.include "map_data_01.p65"
+map_data_02:
+.include "map_data_02.p65"
+map_data_03:
+.include "map_data_03.p65"
+map_data_04:
+.include "map_data_04.p65"
+
+attr_data:
+
+attr_data_00:
+.include "attr_data_00.p65"
+attr_data_01:
+.include "attr_data_01.p65"
+attr_data_02:
+.include "attr_data_02.p65"
+attr_data_03:
+.include "attr_data_03.p65"
+attr_data_04:
+.include "attr_data_04.p65"
+
+
+solid_tiles:
+        ; put $00 if it's not solid
+.byte  $70,$00,$00,$73,$74,$00,$00,$00,$00,$79,$7a,$00,$00,$7d,$7e,$7f
+.byte  $80,$81,$82,$83,$84,$85,$00,$00,$00,$89,$8a,$00,$00,$8d,$8e,$00
+
+
+title_screen:
+.include "title_screen.p65"
+
+title_attr:
+.include "title_attr.p65"
+
+ending_screen:
+.include "ending_screen.p65"
+
+ending_attr:
+.include "ending_attr.p65"
+
+ending_pal:
+.byte $0f,$00,$10,$20,$0f,$20,$11,$21,$0f,$27,$30,$38,$0f,$0c,$2a,$0c 
+.byte $0f,$0e,$37,$06,$0f,$0e,$27,$37,$0f,$27,$30,$38,$0f,$0e,$20,$0c
+
+
+fyeah:
+.incbin "fyeah.raw"
+
+square_notes:
+.include "square_notes.p65"
+
+triangle_notes:
+.include "triangle_notes.p65"
+
+dansong_square1:
+.include "dansong_sq1.p65"
+
+dansong_square2:
+.include "dansong_sq2.p65"
+
+dansong_triangle:
+.include "dansong_tri.p65"
+
+dansong_noise:
+.include "dansong_noi.p65"
+
+fyeah_square1:
+.include "fyeah_sq1.p65"
+
+fyeah_square2:
+.include "fyeah_sq2.p65"
+
+fyeah_triangle:
+.include "fyeah_tri.p65"
+
+fyeah_noise:
+.include "fyeah_noi.p65"
+
+main_square1:
+.include "main_sq1.p65"
+
+main_square2:
+.include "main_sq2.p65"
+
+main_triangle:
+.include "main_tri.p65"
+
+main_noise:
+.include "main_noi.p65"
+
+silence_triangle:
+.byte $ff,$ae,$00,$00
+.byte $ff
+
+silence_square:
+.byte $00,$7c,$00,$00
+.byte $ff
+
+silence_noise:
+.byte $00,$00,$00,$00
+.byte $ff
+
+
+
+vblank:
+    pha
+    txa
+    pha
+    tya
+    pha
+
+
+    lda #$00
+    sta VRAM_ADDR1
+    sta VRAM_ADDR1
+
+    ldx move_cooldown
+    beq +
+    dex 
+    stx move_cooldown
+
+*   lda mus_timer_1
+    bne +
+    jsr update_square1
+    
+*   dec mus_timer_1
+    
+    
+    lda mus_timer_2
+    bne +
+    jsr update_square2
+    
+*   dec mus_timer_2
+
+
+    lda mus_timer_3
+    bne +
+    jsr update_triangle
+    
+*   dec mus_timer_3
+    
+    
+    lda mus_timer_4
+    bne +
+    jsr update_noise
+    
+*   dec mus_timer_4
+
+
+    dec blink_timer
+    bne +
+    lda #BLINK_TIME
+    sta blink_timer
+    lda #$01
+    sta update_blink
+
+*   dec anim1_timer
+    bne +
+    lda #NPC1_ANIM_TIME
+    sta anim1_timer
+    lda #$01
+    sta update_anim1
+
+*   dec anim2_timer
+    bne vblank_exit
+    lda #NPC2_ANIM_TIME
+    sta anim2_timer
+    lda #$01
+    sta update_anim2
+
+
+
+vblank_exit:
+    pla
+    tay
+    pla
+    tax
+    pla
+    rti
+
+
+irq:
+    rti
+
+
+.advance $FFFA
+
+
+; Set interrupt vectors
+.word vblank
+.word reset
+.word irq

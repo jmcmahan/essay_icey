@@ -1,0 +1,62 @@
+; $4008, index to note, length counter load register, timer value
+
+.byte $8f,$ae,$08,$d2
+.byte $8f,$ae,$08,$0e   
+
+.byte $8c,$ae,$08,$d2
+.byte $8c,$ae,$08,$00
+.byte $8c,$ae,$08,$00
+.byte $8c,$ae,$08,$00
+.byte $8c,$ae,$08,$00
+.byte $8c,$ae,$08,$00
+.byte $8c,$ae,$08,$4e
+
+
+
+.byte $7f,$2c,$08,$2a   
+.byte $7f,$30,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$2c,$08,$2a   
+.byte $7f,$1e,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+
+.byte $7f,$2c,$08,$2a   
+.byte $7f,$30,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$2c,$08,$2a   
+.byte $7f,$1e,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+
+.byte $7f,$26,$08,$0e   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$28,$08,$0e   
+.byte $8f,$ae,$08,$38   
+.byte $7f,$2c,$08,$0e   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$1e,$08,$0e   
+.byte $8f,$ae,$08,$38   
+
+.byte $7f,$26,$08,$0e   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$28,$08,$0e   
+.byte $8f,$ae,$08,$38   
+.byte $7f,$2c,$08,$0e   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$1e,$08,$0e   
+.byte $8f,$ae,$08,$38   
+
+.byte $7f,$1e,$08,$2a   
+.byte $7f,$28,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$26,$08,$2a   
+.byte $7f,$22,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+
+.byte $7f,$28,$08,$2a   
+.byte $7f,$26,$08,$2a   
+.byte $8f,$ae,$08,$1c   
+.byte $7f,$2c,$08,$38   
+.byte $7f,$1e,$08,$38   
+
+.byte $ff
+

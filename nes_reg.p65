@@ -1,0 +1,104 @@
+; NES Hardware Registers
+
+; video registers
+
+.alias PPU_CON1         $2000
+.alias PPU_CON2         $2001
+.alias PPU_STAT         $2002 
+.alias SPR_RAM_ADDR     $2003
+.alias SPR_RAM_DATA     $2004
+.alias VRAM_ADDR1       $2005
+.alias VRAM_ADDR2       $2006
+.alias VRAM_DATA        $2007
+.alias SPR_DMA          $4014
+
+; audio registers
+
+.alias PULSE1_CON       $4000
+.alias PULSE1_RAMP      $4001
+.alias PULSE1_FINE      $4002
+.alias PULES1_COARSE    $4003
+.alias PULSE2_CON       $4004
+.alias PULSE2_RAMP      $4005
+.alias PULSE2_FINE      $4006
+.alias PULES2_COARSE    $4007
+.alias TRIANGLE_CON1    $4008
+.alias TRIANGLE_CON2    $4009
+.alias TRIANGLE_FREQ1   $400a
+.alias TRIANGLE_FREQ2   $400b
+.alias NOISE_CON1       $400c
+.alias NOISE_FREQ1      $400e
+.alias NOISE_FREQ2      $400f
+.alias DELTA_CON        $4010
+.alias DELTA_DA         $4011
+.alias DELTA_ADDR       $4012
+.alias DELTA_DLEN       $4013
+.alias CHAN_VCLK        $4015
+
+; input registers
+
+.alias GAMEPORT1        $4016
+.alias GAMEPORT2        $4017
+
+
+; constants for the various bits - use by adding all constants you want
+; (would be better to bitwise OR them, but don't think you can)
+
+; PPU control register 1
+
+.alias VBLANK_NMI_ON        $80
+.alias VBLANK_NMI_OFF       $00
+.alias PPU_SLAVE            $40
+.alias PPU_MASTER           $00
+.alias SPR_8_16             $20 
+.alias SPR_8_8              $00 
+.alias BG_PT_1000           $10
+.alias BG_PT_0000           $00
+.alias SPR_PT_1000          $08
+.alias SPR_PT_0000          $00
+.alias PPU_ADDR_INC_32      $04
+.alias PPU_ADDR_INC_1       $00
+.alias NT_ADDR_2000         $00
+.alias NT_ADDR_2400         $01
+.alias NT_ADDR_2800         $02
+.alias NT_ADDR_2C00         $03
+
+; PPU control register 2
+
+.alias COL_EMPH_RED         $80
+.alias COL_EMPH_BLUE        $40
+.alias COL_EMPH_GREEN       $20
+.alias COL_EMPH_NONE        $00
+.alias SPR_VISIBLE          $10
+.alias SPR_INVISIBLE        $00 
+.alias BG_VISIBLE           $08
+.alias BG_INVISIBLE         $00
+.alias SPR_CLIP_ON          $04
+.alias SPR_CLIP_OFF         $00
+.alias BG_CLIP_ON           $02
+.alias BG_CLIP_OFF          $00
+.alias DIS_COLOR            $00
+.alias DIS_MONO             $01
+
+; PPU status register
+
+.alias IN_VBLANK            $80
+.alias NO_VBLANK            $00
+.alias SPR_0_HIT            $40
+.alias SPR_0_NOT_FOUND      $00
+.alias SPR_GT_8             $20
+.alias SPR_LT_ET_8          $00
+.alias VRAM_WR_IGNORE       $10
+.alias VRAM_WR_NOTICE       $00
+
+; APU sound/vertical clock signal register
+
+.alias VCLK_IRQ_SET         $00
+.alias VCLK_IRQ_CLR         $20
+.alias DM_CHAN_SET          $10
+.alias NOISE_CHAN_SET       $80
+.alias TRIANGLE_CHAN_SET    $40
+.alias PULSE2_CHAN_SET      $20
+.alias PULSE1_CHAN_SET      $10
+
+

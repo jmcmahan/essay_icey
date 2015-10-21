@@ -13,7 +13,7 @@ It runs on the actual NES hardware, as well, but with some added
 choppiness in the music due to how the graphics updates were (mis)handled. A 
 cycle-accurate emulator such as Nestopia will reproduce this choppiness.
 
-Screenshots:
+**Screenshots:**
 
 ![Title Screen](./title.png)
 ![Gameplay](./game.png)

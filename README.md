@@ -8,3 +8,7 @@ directional pad and talk to people or pick up items with the A button.
 The code is written in 6502 assembly and was compiled with the Ophis
 assembler. 
 
+Screenshots:
+
+![Title Screen](./title.png)
+![Gameplay](./game.png)

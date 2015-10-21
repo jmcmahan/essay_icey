@@ -1,5 +1,5 @@
 In this game, you play as Chuck, a worker at the Essay Icey
-(which is a misspelling now set in stone, argh! - should be "Icy") company. Your
+(should be "Icy" - a misspelling set in stone, argh!) company. Your
 goal is to accomplish the tasks given to you by your boss, John, until he
 has nothing left to give you. This is accomplished by picking up items
 around the building and asking your coworkers for hints. Move with the 

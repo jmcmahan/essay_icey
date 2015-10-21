@@ -6,7 +6,8 @@ around the building and asking your coworkers for hints. Move with the
 directional pad and talk to people or pick up items with the A button.
 
 The code is written in 6502 assembly and was compiled with the 
-[Ophis](https://github.com/michaelcmartin/Ophis) assembler. 
+[Ophis](https://github.com/michaelcmartin/Ophis) assembler. The
+main loop is in [chucks_prg.p65](./chucks_prg.p65).
 
 Screenshots:
 
